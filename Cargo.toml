@@ -1,0 +1,13 @@
+cargo-features = ["edition"]
+
+[package]
+name = "gleiphir"
+version = "0.1.0"
+authors = ["iovxw <iovxw@outlook.com>"]
+edition = '2018'
+
+[dependencies]
+libc = "0.2"
+nfqueue = "0.9"
+pnetlink = "0.0.3"
+pnet_macros_support = "0.21"
