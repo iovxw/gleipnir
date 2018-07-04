@@ -7,6 +7,7 @@ use libc;
 use nfqueue;
 
 mod netlink;
+mod proc;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
