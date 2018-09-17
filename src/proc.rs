@@ -40,7 +40,7 @@ pub fn get_proc_by_inode(inode: Inode) -> Option<Process> {
         let inodes = INODE_INDEX.read().unwrap();
         inodes.get(&inode).map(|pid| {
             let procs = PROC_INDEX.read().unwrap();
-            let proc = procs.get(pid).expect("");
+            let proc = procs.get(pid).expect("broken cache");
             proc.clone()
         })
     }

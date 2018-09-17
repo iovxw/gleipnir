@@ -21,10 +21,8 @@ impl SockDiag {
     pub fn find_one<'a>(
         &'a mut self,
         protocol: Proto,
-        src: net::IpAddr,
-        dst: net::IpAddr,
-        sport: u16,
-        dport: u16,
+        src: net::SocketAddr,
+        dst: net::SocketAddr,
     ) -> Result<&'a InetDiagMsg, io::Error> {
         const NLMSG_ALIGNTO: usize = 4;
         const fn nlmsg_align(len: usize) -> usize {
@@ -37,7 +35,7 @@ impl SockDiag {
         const SOCK_DIAG_BY_FAMILY: u16 = 20;
         const INET_DIAG_NOCOOKIE: u32 = !0;
 
-        assert_eq!(src.is_ipv4(), dst.is_ipv4());
+        assert_eq!(src.is_ipv4(), dst.is_ipv4(),);
 
         let nlh = libc::nlmsghdr {
             nlmsg_len: nlmsg_length(mem::size_of::<InetDiagReqV2>()) as u32,
@@ -57,10 +55,10 @@ impl SockDiag {
             pad: 0,
             idiag_states: !0, // any state
             id: InetDiagSockId {
-                idiag_sport: sport.into(),
-                idiag_dport: dport.into(),
-                idiag_src: src.into(),
-                idiag_dst: dst.into(),
+                idiag_sport: src.port().into(),
+                idiag_dport: dst.port().into(),
+                idiag_src: src.ip().into(),
+                idiag_dst: dst.ip().into(),
                 idiag_if: 0,
                 idiag_cookie: [INET_DIAG_NOCOOKIE; 2],
             },
@@ -261,6 +259,7 @@ impl fmt::Debug for Ipv4or6 {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub enum Proto {
     Tcp = libc::IPPROTO_TCP as isize,
     Udp = libc::IPPROTO_UDP as isize,

@@ -1,10 +1,13 @@
-#![feature(rust_2018_preview)]
-#![feature(rust_2018_idioms)]
 #![feature(nll)]
 #![feature(const_fn)]
 
+use std::net::{IpAddr, SocketAddr};
+
 use libc;
 use nfqueue;
+use pnet::packet::{
+    ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
+};
 
 mod netlink;
 mod proc;
@@ -27,11 +30,64 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
 
     println!(" -> msg: {}", msg);
 
-    println!(
-        "XML\n{}",
-        msg.as_xml_str(&[nfqueue::XMLFormatFlags::XmlAll]).unwrap()
-    );
+    if msg.get_indev() != 0 {
+        println!("INPUT");
+    } else if msg.get_outdev() != 0 {
+        println!("OUTPUT");
+    } else {
+        unreachable!("package is from neither INPUT nor OUTPUT");
+    }
 
+    let payload = msg.get_payload();
+    let (saddr, daddr, protocol, ip_payload) = match payload[0] >> 4 {
+        4 => {
+            let pkt = Ipv4Packet::new(payload).expect("Ipv4Packet");
+            let src: IpAddr = pkt.get_source().into();
+            let dst: IpAddr = pkt.get_destination().into();
+            (
+                src,
+                dst,
+                pkt.get_next_level_protocol(),
+                &payload[Ipv6Packet::minimum_packet_size()..],
+            )
+        }
+        6 => {
+            let pkt = Ipv6Packet::new(payload).expect("Ipv6Packet");
+            let src: IpAddr = pkt.get_source().into();
+            let dst: IpAddr = pkt.get_destination().into();
+            (
+                src,
+                dst,
+                pkt.get_next_header(),
+                &payload[Ipv6Packet::minimum_packet_size()..],
+            )
+        }
+        _ => unreachable!("package is neither IPv4 nor IPv6"),
+    };
+    let (protocol, sport, dport) = match protocol {
+        IpNextHeaderProtocols::Tcp => {
+            let pkt = TcpPacket::new(ip_payload).expect("TcpPacket");
+            (netlink::Proto::Tcp, pkt.get_source(), pkt.get_destination())
+        }
+        IpNextHeaderProtocols::Udp => {
+            let pkt = UdpPacket::new(ip_payload).expect("UdpPacket");
+            (netlink::Proto::Udp, pkt.get_source(), pkt.get_destination())
+        }
+        _ => {
+            // ignore other protocol
+            msg.set_verdict(nfqueue::Verdict::Accept);
+            return;
+        }
+    };
+    let src = SocketAddr::new(saddr, sport);
+    let dst = SocketAddr::new(daddr, dport);
+    println!(
+        "SRC: {:?}, DST: {:?}, PROTOCOL: {:?}, LEN: {}",
+        src,
+        dst,
+        protocol,
+        payload.len()
+    );
     state.count += 1;
     println!("count: {}", state.count);
 
