@@ -77,7 +77,7 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
         }
         _ => unreachable!("package is neither IPv4 nor IPv6"),
     };
-    let mut possible_sockets: Vec<(_, _)> = Vec::new();
+    let mut possible_sockets: [Option<(_, _)>; 3] = [None; 3];
     let (protocol, src, dst) = match protocol {
         IpNextHeaderProtocols::Tcp => {
             let pkt = TcpPacket::new(ip_payload).expect("TcpPacket");
@@ -85,9 +85,9 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
             let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
             if device.is_input() {
                 // for INPUT, dst is loacal address, src is remote address
-                possible_sockets.push((dst, src));
+                possible_sockets[0] = Some((dst, src));
             } else {
-                possible_sockets.push((src, dst));
+                possible_sockets[0] = Some((src, dst));
             }
             (netlink::Proto::Tcp, src, dst)
         }
@@ -104,15 +104,15 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
             };
             let unspecified_socket = SocketAddr::new(unspecified_addr, 0);
             if device.is_input() {
-                possible_sockets.push((dst, src));
-                possible_sockets.push((dst, unspecified_socket));
-                possible_sockets
-                    .push((SocketAddr::new(unspecified_addr, dport), unspecified_socket));
+                possible_sockets[0] = Some((dst, src));
+                possible_sockets[1] = Some((dst, unspecified_socket));
+                possible_sockets[2] =
+                    Some((SocketAddr::new(unspecified_addr, dport), unspecified_socket));
             } else {
-                possible_sockets.push((src, dst));
-                possible_sockets.push((src, unspecified_socket));
-                possible_sockets
-                    .push((SocketAddr::new(unspecified_addr, sport), unspecified_socket));
+                possible_sockets[0] = Some((src, dst));
+                possible_sockets[1] = Some((src, unspecified_socket));
+                possible_sockets[2] =
+                    Some((SocketAddr::new(unspecified_addr, sport), unspecified_socket));
             };
             (netlink::Proto::Udp, src, dst)
         }
@@ -124,8 +124,12 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
     };
 
     let mut diag_msg = None;
-    for (local_address, remote_address) in &possible_sockets {
-        match state.diag.query(protocol, *local_address, *remote_address) {
+    for &(local_address, remote_address) in possible_sockets
+        .iter()
+        .take_while(|x| Option::is_some(x))
+        .map(|x| x.as_ref().unwrap())
+    {
+        match state.diag.query(protocol, local_address, remote_address) {
             Ok(r) => diag_msg = Some(r),
             Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => {
