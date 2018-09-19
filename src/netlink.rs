@@ -18,11 +18,11 @@ impl SockDiag {
         Ok(SockDiag { socket, buf })
     }
 
-    pub fn find_one<'a>(
+    pub fn query<'a>(
         &'a mut self,
         protocol: Proto,
-        src: net::SocketAddr,
-        dst: net::SocketAddr,
+        local_address: net::SocketAddr,
+        remote_address: net::SocketAddr,
     ) -> Result<InetDiagMsg, io::Error> {
         const NLMSG_ALIGNTO: usize = 4;
         const fn nlmsg_align(len: usize) -> usize {
@@ -35,7 +35,7 @@ impl SockDiag {
         const SOCK_DIAG_BY_FAMILY: u16 = 20;
         const INET_DIAG_NOCOOKIE: u32 = !0;
 
-        assert_eq!(src.is_ipv4(), dst.is_ipv4());
+        assert_eq!(local_address.is_ipv4(), remote_address.is_ipv4());
 
         let nlh = libc::nlmsghdr {
             nlmsg_len: nlmsg_length(mem::size_of::<InetDiagReqV2>()) as u32,
@@ -49,7 +49,7 @@ impl SockDiag {
             nlmsg_pid: 0,
         };
         let req = InetDiagReqV2 {
-            sdiag_family: if src.is_ipv4() {
+            sdiag_family: if local_address.is_ipv4() {
                 libc::AF_INET
             } else {
                 libc::AF_INET6
@@ -59,10 +59,10 @@ impl SockDiag {
             pad: 0,
             idiag_states: !0, // any state
             id: InetDiagSockId {
-                idiag_sport: src.port().into(),
-                idiag_dport: dst.port().into(),
-                idiag_src: src.ip().into(),
-                idiag_dst: dst.ip().into(),
+                idiag_sport: local_address.port().into(),
+                idiag_dport: remote_address.port().into(),
+                idiag_src: local_address.ip().into(),
+                idiag_dst: remote_address.ip().into(),
                 idiag_if: 0,
                 idiag_cookie: [INET_DIAG_NOCOOKIE; 2],
             },
@@ -91,10 +91,10 @@ impl SockDiag {
 
                 let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
                 let diag_msg = unsafe { &(*diag_msg) };
-                if diag_msg.id.idiag_src == src.ip()
-                    && diag_msg.id.idiag_sport == src.port()
-                    && diag_msg.id.idiag_dst == dst.ip()
-                    && diag_msg.id.idiag_dport == dst.port()
+                if diag_msg.id.idiag_src == local_address.ip()
+                    && diag_msg.id.idiag_sport == local_address.port()
+                    && diag_msg.id.idiag_dst == remote_address.ip()
+                    && diag_msg.id.idiag_dport == remote_address.port()
                 {
                     r = Some(*diag_msg);
                 }

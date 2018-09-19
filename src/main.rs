@@ -84,6 +84,7 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
             let (sport, dport) = (pkt.get_source(), pkt.get_destination());
             let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
             if device.is_input() {
+                // for INPUT, dst is loacal address, src is remote address
                 possible_sockets.push((dst, src));
             } else {
                 possible_sockets.push((src, dst));
@@ -123,14 +124,14 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
     };
 
     let mut diag_msg = None;
-    for (src, dst) in &possible_sockets {
-        match state.diag.find_one(protocol, *src, *dst) {
+    for (local_address, remote_address) in &possible_sockets {
+        match state.diag.query(protocol, *local_address, *remote_address) {
             Ok(r) => diag_msg = Some(r),
             Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => {
                 eprintln!(
-                    "ERROR: {}, DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}",
-                    e, device, protocol, src, dst,
+                    "ERROR: {}, DEV: {:?}, PROTOCOL: {:?}, LOACALADDR: {}, REMOTEADDR: {}",
+                    e, device, protocol, local_address, remote_address,
                 );
                 msg.set_verdict(nfqueue::Verdict::Accept);
                 return;
@@ -215,6 +216,6 @@ fn dump_net(proto: &str) {
             std::net::SocketAddr::new(std::net::Ipv4Addr::from(local_addr).into(), local_port);
         let remote_socket =
             std::net::SocketAddr::new(std::net::Ipv4Addr::from(remote_addr).into(), remote_port);
-        println!("SRC: {}, DST: {}", local_socket, remote_socket);
+        println!("LOCAL: {}, REMOTE: {}", local_socket, remote_socket);
     }
 }
