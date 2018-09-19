@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::prelude::*;
+use std::io::{self, prelude::*};
 use std::path::PathBuf;
 
 type Pid = usize;
@@ -46,6 +46,9 @@ pub fn get_proc_by_inode(inode: Inode) -> Option<Process> {
             })
         })
     }
+    if inode == 0 {
+        return None;
+    }
     get(inode)
         .or_else(|| {
             add_new_proc_to_cache();
@@ -85,7 +88,10 @@ fn add_new_proc_to_cache() {
                     if garbage.remove(&pid) {
                         old.insert(pid);
                     } else {
-                        let proc = parse_proc_pid(entry.path(), pid);
+                        let proc = match parse_proc_pid(entry.path(), pid) {
+                            Ok(r) => r,
+                            Err(_) => continue,
+                        };
                         for &inode in &proc.inodes {
                             inodes.insert(inode, pid);
                         }
@@ -114,8 +120,7 @@ fn refresh_old_proc_in_cache() {
                 let ProcCache { new, old, .. } = &mut *cache;
                 for pid in old.drain() {
                     let path: PathBuf = format!("{}{}", PROC, pid).into();
-                    if path.exists() {
-                        let proc = parse_proc_pid(path, pid);
+                    if let Ok(proc) = parse_proc_pid(path, pid) {
                         for &inode in &proc.inodes {
                             inodes.insert(inode, pid);
                         }
@@ -134,23 +139,19 @@ fn refresh_old_proc_in_cache() {
 }
 
 // http://manpages.ubuntu.com/manpages/bionic/en/man5/proc.5.html
-fn parse_proc_pid(mut path: PathBuf, pid: usize) -> Process {
+fn parse_proc_pid(mut path: PathBuf, pid: usize) -> Result<Process, io::Error> {
     path.push("fd");
-    let inodes = fs::read_dir(&path)
-        .expect("open /proc/<pid>/fd")
-        .map(|e| e.expect("visit /proc/<pid>/fd"))
-        .filter_map(|e| {
-            let path = fs::read_link(e.path()).expect("read /proc/<pid>/fd/<fd>");
-            let path = path.to_str().expect("symlink not a vaild UTF-8");
-            if path.starts_with("socket:[") && path.ends_with("]") {
-                let inode = path[8..path.len() - 1]
-                    .parse::<Inode>()
-                    .expect("inode not a number");
-                Some(inode)
-            } else {
-                None
-            }
-        }).collect();
+    let mut inodes = Vec::new();
+    for file in fs::read_dir(&path)? {
+        let path = fs::read_link(file?.path())?;
+        let path = path.to_str().expect("symlink not a vaild UTF-8");
+        if path.starts_with("socket:[") && path.ends_with("]") {
+            let inode = path[8..path.len() - 1]
+                .parse::<Inode>()
+                .expect("inode not a number");
+            inodes.push(inode);
+        }
+    }
     path.pop();
     path.push("exe");
     let exe = fs::read_link(&path)
@@ -160,19 +161,19 @@ fn parse_proc_pid(mut path: PathBuf, pid: usize) -> Process {
         .to_owned();
     path.pop();
     path.push("stat");
-    let mut stat = File::open(path).expect("open /proc/<pid>/stat");
+    let mut stat = File::open(path)?;
     let mut buf = [0u8; 512];
-    let n = stat.read(&mut buf).expect("read /proc/<pid>/stat");
+    let n = stat.read(&mut buf)?;
     let stat = std::str::from_utf8(&buf[..n]).expect("stat not a vaild UTF-8");
     // TODO: expect message
     let mut iter = stat.rsplit(')').next().expect("").split(' ').skip(2);
     let ppid = iter.next().expect("").parse().expect("");
     let pgrp = iter.next().expect("").parse().expect("");
-    Process {
+    Ok(Process {
         pid,
         ppid,
         pgrp,
         exe,
         inodes,
-    }
+    })
 }

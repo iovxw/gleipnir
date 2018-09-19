@@ -1,4 +1,4 @@
-use std::{fmt, io, mem, net};
+use std::{cmp, fmt, io, mem, net};
 
 use pnet_macros_support::packet::Packet;
 use pnetlink::{
@@ -14,7 +14,7 @@ pub struct SockDiag {
 impl SockDiag {
     pub fn new() -> io::Result<SockDiag> {
         let socket = NetlinkSocket::bind(NetlinkProtocol::Inet_diag, 0)?;
-        let buf = vec![0; 128];
+        let buf = vec![0; 2048];
         Ok(SockDiag { socket, buf })
     }
 
@@ -23,7 +23,7 @@ impl SockDiag {
         protocol: Proto,
         src: net::SocketAddr,
         dst: net::SocketAddr,
-    ) -> Result<&'a InetDiagMsg, io::Error> {
+    ) -> Result<InetDiagMsg, io::Error> {
         const NLMSG_ALIGNTO: usize = 4;
         const fn nlmsg_align(len: usize) -> usize {
             (len + NLMSG_ALIGNTO - 1) & !(NLMSG_ALIGNTO - 1)
@@ -35,12 +35,16 @@ impl SockDiag {
         const SOCK_DIAG_BY_FAMILY: u16 = 20;
         const INET_DIAG_NOCOOKIE: u32 = !0;
 
-        assert_eq!(src.is_ipv4(), dst.is_ipv4(),);
+        assert_eq!(src.is_ipv4(), dst.is_ipv4());
 
         let nlh = libc::nlmsghdr {
             nlmsg_len: nlmsg_length(mem::size_of::<InetDiagReqV2>()) as u32,
             nlmsg_type: SOCK_DIAG_BY_FAMILY,
-            nlmsg_flags: (libc::NLM_F_REQUEST) as u16,
+            nlmsg_flags: (libc::NLM_F_REQUEST | if protocol.is_udp() {
+                libc::NLM_F_MATCH // TODO: do we really need this for UDP?
+            } else {
+                0
+            }) as u16,
             nlmsg_seq: 0,
             nlmsg_pid: 0,
         };
@@ -63,59 +67,64 @@ impl SockDiag {
                 idiag_cookie: [INET_DIAG_NOCOOKIE; 2],
             },
         };
-        // let mut iov = [
-        //     libc::iovec {
-        //         iov_base: &mut nlh as *mut _ as *mut libc::c_void,
-        //         iov_len: mem::size_of::<libc::nlmsghdr>(),
-        //     },
-        //     libc::iovec {
-        //         iov_base: &mut req as *mut _ as *mut libc::c_void,
-        //         iov_len: mem::size_of::<InetDiagReqV2>(),
-        //     },
-        // ];
-        // let mut sa = unsafe { mem::zeroed::<libc::sockaddr_nl>() };
-        // sa.nl_family = libc::AF_NETLINK as u16;
-        // let mut msg = libc::msghdr {
-        //     msg_name: &mut sa as *mut _ as *mut libc::c_void,
-        //     msg_namelen: mem::size_of::<libc::sockaddr_nl>() as u32,
-        //     msg_iov: &mut iov as *mut _ as *mut libc::iovec,
-        //     msg_iovlen: 2,
-        //     msg_control: libc::NL0 as *mut _,
-        //     msg_controllen: 0,
-        //     msg_flags: 0,
-        // };
-        // let res = unsafe { libc::sendmsg(socket.as_raw_fd(), &mut msg, 0) };
-        // if res == -1 {
-        //     return Err(io::Error::last_os_error());
-        // }
+
         #[repr(C)]
         struct Msg(libc::nlmsghdr, InetDiagReqV2);
         let msg = Msg(nlh, req);
         let msg: [u8; mem::size_of::<Msg>()] = unsafe { mem::transmute(msg) };
         self.socket.send(&msg)?;
 
-        let n = self.socket.recv(&mut self.buf)?;
-        if let Some(msg) = NetlinkIterable::new(&self.buf[..n]).next() {
-            if msg.get_kind() == NLMSG_ERROR || msg.get_kind() == NLMSG_DONE {
-                return Err(io::Error::from(io::ErrorKind::NotFound));
-            }
-            let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
-            let diag_msg = unsafe { &(*diag_msg) };
-            // make sure socket is empty
-            match self.socket.recv(&mut [0u8; 1]) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => (),
+        let mut r = None;
+        'l: loop {
+            let n = match self.socket.recv(&mut self.buf) {
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
                 Err(e) => return Err(e),
-                Ok(_) => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "SockDiag::find_one got more than one response",
-                    ))
+                Ok(n) => n,
+            };
+            for msg in NetlinkIterable::new(&self.buf[..n]).next() {
+                if msg.get_kind() == NLMSG_ERROR {
+                    return Err(io::Error::from(io::ErrorKind::NotFound));
+                }
+                if msg.get_kind() == NLMSG_DONE {
+                    break 'l;
+                }
+
+                let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
+                let diag_msg = unsafe { &(*diag_msg) };
+                if diag_msg.id.idiag_src == src.ip()
+                    && diag_msg.id.idiag_sport == src.port()
+                    && diag_msg.id.idiag_dst == dst.ip()
+                    && diag_msg.id.idiag_dport == dst.port()
+                {
+                    r = Some(*diag_msg);
                 }
             }
-            Ok(diag_msg)
-        } else {
-            Err(io::Error::from(io::ErrorKind::NotFound))
         }
+
+        r.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+
+        // let n = self.socket.recv(&mut self.buf)?;
+        // if let Some(msg) = NetlinkIterable::new(&self.buf[..n]).next() {
+        //     if msg.get_kind() == NLMSG_ERROR || msg.get_kind() == NLMSG_DONE {
+        //         return Err(io::Error::from(io::ErrorKind::NotFound));
+        //     }
+        //     let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
+        //     let diag_msg = unsafe { &(*diag_msg) };
+        //     // make sure socket is empty
+        //     match self.socket.recv(&mut [0u8; 64]) {
+        //         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => (),
+        //         Err(e) => return Err(e),
+        //         Ok(_) => {
+        //             return Err(io::Error::new(
+        //                 io::ErrorKind::InvalidData,
+        //                 "SockDiag::find_one got more than one response",
+        //             ));
+        //         }
+        //     }
+        //     Ok(diag_msg)
+        // } else {
+        //     Err(io::Error::from(io::ErrorKind::NotFound))
+        // }
     }
 }
 
@@ -131,7 +140,7 @@ struct InetDiagReqV2 {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct InetDiagMsg {
     pub idiag_family: u8,
     pub idiag_state: u8,
@@ -146,7 +155,7 @@ pub struct InetDiagMsg {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct InetDiagSockId {
     pub idiag_sport: Port,
     pub idiag_dport: Port,
@@ -169,6 +178,12 @@ impl From<u16> for Port {
 impl From<Port> for u16 {
     fn from(port: Port) -> Self {
         ((port.0[0] as u16) << 8) | (port.0[1] as u16)
+    }
+}
+
+impl cmp::PartialEq<u16> for Port {
+    fn eq(&self, other: &u16) -> bool {
+        u16::from(*self) == *other
     }
 }
 
@@ -249,6 +264,27 @@ impl From<net::IpAddr> for Ipv4or6 {
     }
 }
 
+impl cmp::PartialEq<net::IpAddr> for Ipv4or6 {
+    fn eq(&self, other: &net::IpAddr) -> bool {
+        match other {
+            net::IpAddr::V4(other) => self == other,
+            net::IpAddr::V6(other) => self == other,
+        }
+    }
+}
+
+impl cmp::PartialEq<net::Ipv4Addr> for Ipv4or6 {
+    fn eq(&self, other: &net::Ipv4Addr) -> bool {
+        net::Ipv4Addr::from(*self) == *other
+    }
+}
+
+impl cmp::PartialEq<net::Ipv6Addr> for Ipv4or6 {
+    fn eq(&self, other: &net::Ipv6Addr) -> bool {
+        net::Ipv6Addr::from(*self) == *other
+    }
+}
+
 impl fmt::Debug for Ipv4or6 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Ipv4or6")
@@ -259,10 +295,16 @@ impl fmt::Debug for Ipv4or6 {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Proto {
     Tcp = libc::IPPROTO_TCP as isize,
     Udp = libc::IPPROTO_UDP as isize,
+}
+
+impl Proto {
+    pub fn is_udp(&self) -> bool {
+        *self == Proto::Udp
+    }
 }
 
 #[test]

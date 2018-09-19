@@ -1,7 +1,7 @@
 #![feature(nll)]
 #![feature(const_fn)]
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use libc;
 use nfqueue;
@@ -16,27 +16,40 @@ const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
 
 struct State {
-    count: u32,
+    diag: netlink::SockDiag,
 }
 
 impl State {
     pub fn new() -> State {
-        State { count: 0 }
+        State {
+            diag: netlink::SockDiag::new().expect(""),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum Device {
+    Input,
+    Ouput,
+}
+
+impl Device {
+    fn is_input(&self) -> bool {
+        match self {
+            Device::Input => true,
+            Device::Ouput => false,
+        }
     }
 }
 
 fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
-    println!("Packet received [id: 0x{:x}]\n", msg.get_id());
-
-    println!(" -> msg: {}", msg);
-
-    if msg.get_indev() != 0 {
-        println!("INPUT");
+    let device = if msg.get_indev() != 0 {
+        Device::Input
     } else if msg.get_outdev() != 0 {
-        println!("OUTPUT");
+        Device::Ouput
     } else {
         unreachable!("package is from neither INPUT nor OUTPUT");
-    }
+    };
 
     let payload = msg.get_payload();
     let (saddr, daddr, protocol, ip_payload) = match payload[0] >> 4 {
@@ -48,7 +61,7 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
                 src,
                 dst,
                 pkt.get_next_level_protocol(),
-                &payload[Ipv6Packet::minimum_packet_size()..],
+                &payload[Ipv4Packet::minimum_packet_size()..],
             )
         }
         6 => {
@@ -64,14 +77,43 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
         }
         _ => unreachable!("package is neither IPv4 nor IPv6"),
     };
-    let (protocol, sport, dport) = match protocol {
+    let mut possible_sockets: Vec<(_, _)> = Vec::new();
+    let (protocol, src, dst) = match protocol {
         IpNextHeaderProtocols::Tcp => {
             let pkt = TcpPacket::new(ip_payload).expect("TcpPacket");
-            (netlink::Proto::Tcp, pkt.get_source(), pkt.get_destination())
+            let (sport, dport) = (pkt.get_source(), pkt.get_destination());
+            let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
+            if device.is_input() {
+                possible_sockets.push((dst, src));
+            } else {
+                possible_sockets.push((src, dst));
+            }
+            (netlink::Proto::Tcp, src, dst)
         }
         IpNextHeaderProtocols::Udp => {
             let pkt = UdpPacket::new(ip_payload).expect("UdpPacket");
-            (netlink::Proto::Udp, pkt.get_source(), pkt.get_destination())
+            let (sport, dport) = (pkt.get_source(), pkt.get_destination());
+            let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
+
+            // for UDP listener, the remote address is unspecified
+            let unspecified_addr = if saddr.is_ipv4() {
+                Ipv4Addr::UNSPECIFIED.into()
+            } else {
+                Ipv6Addr::UNSPECIFIED.into()
+            };
+            let unspecified_socket = SocketAddr::new(unspecified_addr, 0);
+            if device.is_input() {
+                possible_sockets.push((dst, src));
+                possible_sockets.push((dst, unspecified_socket));
+                possible_sockets
+                    .push((SocketAddr::new(unspecified_addr, dport), unspecified_socket));
+            } else {
+                possible_sockets.push((src, dst));
+                possible_sockets.push((src, unspecified_socket));
+                possible_sockets
+                    .push((SocketAddr::new(unspecified_addr, sport), unspecified_socket));
+            };
+            (netlink::Proto::Udp, src, dst)
         }
         _ => {
             // ignore other protocol
@@ -79,25 +121,60 @@ fn queue_callback(msg: &nfqueue::Message, state: &mut State) {
             return;
         }
     };
-    let src = SocketAddr::new(saddr, sport);
-    let dst = SocketAddr::new(daddr, dport);
+
+    let mut diag_msg = None;
+    for (src, dst) in &possible_sockets {
+        match state.diag.find_one(protocol, *src, *dst) {
+            Ok(r) => diag_msg = Some(r),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                eprintln!(
+                    "ERROR: {}, DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}",
+                    e, device, protocol, src, dst,
+                );
+                msg.set_verdict(nfqueue::Verdict::Accept);
+                return;
+            }
+        };
+        break;
+    }
+
+    let diag_msg = match diag_msg {
+        Some(r) => r,
+        None => {
+            eprintln!(
+                "ERROR: not found, DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}",
+                device, protocol, src, dst
+            );
+            msg.set_verdict(nfqueue::Verdict::Accept);
+            return;
+        }
+    };
+
+    let proc = match proc::get_proc_by_inode(diag_msg.idiag_inode) {
+        Some(r) => r,
+        None => {
+            eprintln!(
+                "ERROR: failed to find process by inode {}, DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}",
+                diag_msg.idiag_inode, device, protocol, src, dst
+            );
+            msg.set_verdict(nfqueue::Verdict::Accept);
+            return;
+        }
+    };
+
     println!(
-        "SRC: {:?}, DST: {:?}, PROTOCOL: {:?}, LEN: {}",
+        "DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}, LEN: {}, EXE: {}",
+        device,
+        protocol,
         src,
         dst,
-        protocol,
-        payload.len()
+        payload.len(),
+        proc.exe,
     );
-    state.count += 1;
-    println!("count: {}", state.count);
 
     msg.set_verdict(nfqueue::Verdict::Accept);
 }
-
-// 两个 queue 接受包，一个 NEW，一个 RELATED,ESTABLISHED
-// 分别管防火墙和限速
-// diag 获取对应的 inode uid
-// 监听所有 /proc/<PID>/fd/<N> -> socket[507218], 获得 pid 和 inode 的对应，需要注意会有多个 pid
 
 fn main() {
     let mut q = nfqueue::Queue::new(State::new());
@@ -114,4 +191,30 @@ fn main() {
     q.run_loop();
 
     q.close();
+}
+
+#[allow(unused)]
+/// debug function
+fn dump_net(proto: &str) {
+    let v = std::fs::read_to_string(format!("/proc/net/{}", proto)).unwrap();
+    for line in v.lines().skip(1) {
+        let mut iter = line.split_whitespace().skip(1);
+        let (local_socket, remote_socket) = (iter.next().expect("1"), iter.next().expect("2"));
+        let (local_addr, local_port) = local_socket.split_at(local_socket.rfind(':').expect("3"));
+        let (local_addr, local_port) = (
+            u32::from_be(u32::from_str_radix(local_addr, 16).expect("4")),
+            u16::from_str_radix(&local_port[1..], 16).expect("5"),
+        );
+        let (remote_addr, remote_port) =
+            remote_socket.split_at(remote_socket.rfind(':').expect("6"));
+        let (remote_addr, remote_port) = (
+            u32::from_be(u32::from_str_radix(remote_addr, 16).expect("7")),
+            u16::from_str_radix(&remote_port[1..], 16).expect("8"),
+        );
+        let local_socket =
+            std::net::SocketAddr::new(std::net::Ipv4Addr::from(local_addr).into(), local_port);
+        let remote_socket =
+            std::net::SocketAddr::new(std::net::Ipv4Addr::from(remote_addr).into(), remote_port);
+        println!("SRC: {}, DST: {}", local_socket, remote_socket);
+    }
 }
