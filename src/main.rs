@@ -9,6 +9,8 @@ use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
 };
 
+#[macro_use]
+mod utils;
 mod netlink;
 mod proc;
 

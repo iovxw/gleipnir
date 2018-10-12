@@ -35,15 +35,13 @@ struct ProcCache {
 
 pub fn get_proc_by_inode(inode: Inode) -> Option<Process> {
     fn get(inode: Inode) -> Option<Process> {
-        INODE_INDEX.with(|inode_index| {
-            let inodes = inode_index.borrow();
-            inodes.get(&inode).map(|pid| {
-                PROC_INDEX.with(|proc_index| {
-                    let procs = proc_index.borrow();
-                    let proc = procs.get(pid).expect("broken cache");
-                    proc.clone()
-                })
-            })
+        let_tls!(inode_index, INODE_INDEX);
+        let inodes = inode_index.borrow();
+        inodes.get(&inode).map(|pid| {
+            let_tls!(proc_index, PROC_INDEX);
+            let procs = proc_index.borrow();
+            let proc = procs.get(pid).expect("broken cache");
+            proc.clone()
         })
     }
     if inode == 0 {
@@ -53,61 +51,59 @@ pub fn get_proc_by_inode(inode: Inode) -> Option<Process> {
         .or_else(|| {
             add_new_proc_to_cache();
             get(inode)
-        }).or_else(|| {
+        })
+        .or_else(|| {
             refresh_old_proc_in_cache();
             get(inode)
         })
 }
 
 fn add_new_proc_to_cache() {
-    PROC_CACHE.with(|proc_cache| {
-        INODE_INDEX.with(|inode_index| {
-            PROC_INDEX.with(|proc_index| {
-                let mut cache = proc_cache.borrow_mut();
-                let mut inodes = inode_index.borrow_mut();
-                let mut procs = proc_index.borrow_mut();
-                let ProcCache { new, old, garbage } = &mut *cache;
-                garbage.clear();
-                garbage.extend(new.drain());
-                garbage.extend(old.drain());
-                for (entry, pid) in fs::read_dir(PROC)
-                    .expect("open /proc")
-                    .map(|e| e.expect("visit /proc"))
-                    .filter_map(|e| {
-                        let path = e.path();
-                        let file_name = path
-                            .file_name()
-                            .expect("no file_name")
-                            .to_str()
-                            .expect("file_name not a vaild UTF-8");
-                        match file_name.parse::<Pid>() {
-                            Ok(pid) => Some((e, pid)),
-                            _ => None,
-                        }
-                    }) {
-                    if garbage.remove(&pid) {
-                        old.insert(pid);
-                    } else {
-                        let proc = match parse_proc_pid(entry.path(), pid) {
-                            Ok(r) => r,
-                            Err(_) => continue,
-                        };
-                        for &inode in &proc.inodes {
-                            inodes.insert(inode, pid);
-                        }
-                        procs.insert(pid, proc);
-                        new.insert(pid);
-                    }
-                }
-                for pid in &*garbage {
-                    let proc = procs.remove(pid).expect("");
-                    for inode in &proc.inodes {
-                        inodes.remove(inode);
-                    }
-                }
-            })
-        })
-    })
+    let_tls!(proc_cache, PROC_CACHE);
+    let_tls!(inode_index, INODE_INDEX);
+    let_tls!(proc_index, PROC_INDEX);
+    let mut cache = proc_cache.borrow_mut();
+    let mut inodes = inode_index.borrow_mut();
+    let mut procs = proc_index.borrow_mut();
+    let ProcCache { new, old, garbage } = &mut *cache;
+    garbage.clear();
+    garbage.extend(new.drain());
+    garbage.extend(old.drain());
+    for (entry, pid) in fs::read_dir(PROC)
+        .expect("open /proc")
+        .map(|e| e.expect("visit /proc"))
+        .filter_map(|e| {
+            let path = e.path();
+            let file_name = path
+                .file_name()
+                .expect("no file_name")
+                .to_str()
+                .expect("file_name not a vaild UTF-8");
+            match file_name.parse::<Pid>() {
+                Ok(pid) => Some((e, pid)),
+                _ => None,
+            }
+        }) {
+        if garbage.remove(&pid) {
+            old.insert(pid);
+        } else {
+            let proc = match parse_proc_pid(entry.path(), pid) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            for &inode in &proc.inodes {
+                inodes.insert(inode, pid);
+            }
+            procs.insert(pid, proc);
+            new.insert(pid);
+        }
+    }
+    for pid in &*garbage {
+        let proc = procs.remove(pid).expect("");
+        for inode in &proc.inodes {
+            inodes.remove(inode);
+        }
+    }
 }
 
 fn refresh_old_proc_in_cache() {
