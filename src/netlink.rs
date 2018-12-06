@@ -1,21 +1,19 @@
 use std::{cmp, fmt, io, mem, net};
 
-use pnet_macros_support::packet::Packet;
+use pnet_macros_support::packet::{Packet, PacketSize};
 use pnetlink::{
-    packet::netlink::{NetlinkIterable, NLMSG_DONE, NLMSG_ERROR},
+    packet::netlink::{NetlinkMsgFlags, NetlinkReader, NetlinkRequestBuilder},
     socket::{NetlinkProtocol, NetlinkSocket},
 };
 
 pub struct SockDiag {
     socket: NetlinkSocket,
-    buf: Vec<u8>,
 }
 
 impl SockDiag {
     pub fn new() -> io::Result<SockDiag> {
         let socket = NetlinkSocket::bind(NetlinkProtocol::Inet_diag, 0)?;
-        let buf = vec![0; 2048];
-        Ok(SockDiag { socket, buf })
+        Ok(SockDiag { socket })
     }
 
     pub fn query<'a>(
@@ -24,30 +22,11 @@ impl SockDiag {
         local_address: net::SocketAddr,
         remote_address: net::SocketAddr,
     ) -> Result<InetDiagMsg, io::Error> {
-        const NLMSG_ALIGNTO: usize = 4;
-        const fn nlmsg_align(len: usize) -> usize {
-            (len + NLMSG_ALIGNTO - 1) & !(NLMSG_ALIGNTO - 1)
-        }
-        const NLMSG_HDRLEN: usize = nlmsg_align(mem::size_of::<libc::nlmsghdr>());
-        const fn nlmsg_length(len: usize) -> usize {
-            len + NLMSG_HDRLEN
-        }
         const SOCK_DIAG_BY_FAMILY: u16 = 20;
         const INET_DIAG_NOCOOKIE: u32 = !0;
 
         assert_eq!(local_address.is_ipv4(), remote_address.is_ipv4());
 
-        let nlh = libc::nlmsghdr {
-            nlmsg_len: nlmsg_length(mem::size_of::<InetDiagReqV2>()) as u32,
-            nlmsg_type: SOCK_DIAG_BY_FAMILY,
-            nlmsg_flags: (libc::NLM_F_REQUEST | if protocol.is_udp() {
-                libc::NLM_F_MATCH // TODO: do we really need this for UDP?
-            } else {
-                0
-            }) as u16,
-            nlmsg_seq: 0,
-            nlmsg_pid: 0,
-        };
         let req = InetDiagReqV2 {
             sdiag_family: if local_address.is_ipv4() {
                 libc::AF_INET
@@ -68,36 +47,29 @@ impl SockDiag {
             },
         };
 
-        #[repr(C)]
-        struct Msg(libc::nlmsghdr, InetDiagReqV2);
-        let msg = Msg(nlh, req);
-        let msg: [u8; mem::size_of::<Msg>()] = unsafe { mem::transmute(msg) };
-        self.socket.send(&msg)?;
+        let mut flags = NetlinkMsgFlags::NLM_F_REQUEST;
+        if protocol.is_udp() {
+            // TODO: do we really need this for UDP?
+            flags.insert(NetlinkMsgFlags::NLM_F_MATCH);
+        }
+
+        let req = NetlinkRequestBuilder::new(SOCK_DIAG_BY_FAMILY, flags)
+            .append(req)
+            .build();
+        self.socket.send(req.packet())?;
 
         let mut r = None;
-        'l: loop {
-            let n = match self.socket.recv(&mut self.buf) {
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
-                Err(e) => return Err(e),
-                Ok(n) => n,
-            };
-            for msg in NetlinkIterable::new(&self.buf[..n]).next() {
-                if msg.get_kind() == NLMSG_ERROR {
-                    return Err(io::Error::from(io::ErrorKind::NotFound));
-                }
-                if msg.get_kind() == NLMSG_DONE {
-                    break 'l;
-                }
-
-                let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
-                let diag_msg = unsafe { &(*diag_msg) };
-                if diag_msg.id.idiag_src == local_address.ip()
-                    && diag_msg.id.idiag_sport == local_address.port()
-                    && diag_msg.id.idiag_dst == remote_address.ip()
-                    && diag_msg.id.idiag_dport == remote_address.port()
-                {
-                    r = Some(*diag_msg);
-                }
+        let responses = NetlinkReader::new(&mut self.socket);
+        for msg in responses {
+            let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
+            let diag_msg = unsafe { &(*diag_msg) };
+            if diag_msg.id.idiag_src == local_address.ip()
+                && diag_msg.id.idiag_sport == local_address.port()
+                && diag_msg.id.idiag_dst == remote_address.ip()
+                && diag_msg.id.idiag_dport == remote_address.port()
+                && diag_msg.idiag_inode != 0
+            {
+                r = Some(*diag_msg);
             }
         }
 
@@ -137,6 +109,22 @@ struct InetDiagReqV2 {
     pad: u8,
     idiag_states: u32,
     id: InetDiagSockId,
+}
+
+impl Packet for InetDiagReqV2 {
+    fn packet(&self) -> &[u8] {
+        let p: &[u8; mem::size_of::<Self>()] = unsafe { mem::transmute(self) };
+        p
+    }
+    fn payload(&self) -> &[u8] {
+        &[]
+    }
+}
+
+impl PacketSize for InetDiagReqV2 {
+    fn packet_size(&self) -> usize {
+        mem::size_of::<Self>()
+    }
 }
 
 #[repr(C)]
