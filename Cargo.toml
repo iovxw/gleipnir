@@ -6,7 +6,7 @@ edition = '2018'
 
 [dependencies]
 libc = "0.2"
-nfqueue = "0.9"
+nfqueue = { version = "0.9", path = "./nfqueue-rs" }
 pnet = "0.21"
 pnet_macros_support = "0.21"
 pnetlink = "0.0.3"
