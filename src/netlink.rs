@@ -48,7 +48,7 @@ impl SockDiag {
         };
 
         let mut flags = NetlinkMsgFlags::NLM_F_REQUEST;
-        if protocol.is_udp() {
+        if protocol != Proto::Tcp {
             // TODO: do we really need this for UDP?
             flags.insert(NetlinkMsgFlags::NLM_F_MATCH);
         }
@@ -63,6 +63,7 @@ impl SockDiag {
         for msg in responses {
             let diag_msg = msg.payload() as *const _ as *const InetDiagMsg;
             let diag_msg = unsafe { &(*diag_msg) };
+            // filter for UDP
             if diag_msg.id.idiag_src == local_address.ip()
                 && diag_msg.id.idiag_sport == local_address.port()
                 && diag_msg.id.idiag_dst == remote_address.ip()
@@ -287,12 +288,7 @@ impl fmt::Debug for Ipv4or6 {
 pub enum Proto {
     Tcp = libc::IPPROTO_TCP as isize,
     Udp = libc::IPPROTO_UDP as isize,
-}
-
-impl Proto {
-    pub fn is_udp(&self) -> bool {
-        *self == Proto::Udp
-    }
+    UdpLite = libc::IPPROTO_UDPLITE as isize,
 }
 
 #[test]

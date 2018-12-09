@@ -93,7 +93,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
             }
             (netlink::Proto::Tcp, src, dst)
         }
-        IpNextHeaderProtocols::Udp => {
+        IpNextHeaderProtocols::Udp | IpNextHeaderProtocols::UdpLite => {
             let pkt = UdpPacket::new(ip_payload).expect("UdpPacket");
             let (sport, dport) = (pkt.get_source(), pkt.get_destination());
             let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
@@ -116,7 +116,12 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
                 possible_sockets[2] =
                     Some((SocketAddr::new(unspecified_addr, sport), unspecified_socket));
             };
-            (netlink::Proto::Udp, src, dst)
+            let p = if protocol == IpNextHeaderProtocols::Udp {
+                netlink::Proto::Udp
+            } else {
+                netlink::Proto::UdpLite
+            };
+            (p, src, dst)
         }
         _ => {
             // ignore other protocol
