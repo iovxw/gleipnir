@@ -284,7 +284,7 @@ impl fmt::Debug for Ipv4or6 {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Proto {
     Tcp = libc::IPPROTO_TCP as isize,
     Udp = libc::IPPROTO_UDP as isize,

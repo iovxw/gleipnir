@@ -13,6 +13,8 @@ use pnet::packet::{
 mod utils;
 mod netlink;
 mod proc;
+mod rules;
+mod ablock;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
@@ -29,7 +31,7 @@ impl State {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
 enum Device {
     Input,
     Ouput,
