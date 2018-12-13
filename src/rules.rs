@@ -141,6 +141,7 @@ struct Rules {
     v6_table: IpLookupTable<Ipv6Addr, Vec<usize>>,
     any_v6: Vec<usize>,
     raw: Vec<Rule>,
+    default_target: RuleTarget,
 }
 
 impl Rules {
@@ -151,27 +152,23 @@ impl Rules {
         addr: IpAddr,
         len: usize,
         exe: &str,
-    ) -> Option<bool> {
+    ) -> bool {
         let mut hasher = DefaultHasher::new();
         (device, protocol, addr, exe).hash(&mut hasher);
         let lru_index = hasher.finish();
-        MATCH_CACHE
+
+        let target = MATCH_CACHE
             .with(|cache| cache.borrow_mut().get(&lru_index).cloned())
-            .or_else(|| {
-                self.match_target(device, protocol, addr, exe).map(|r| {
-                    MATCH_CACHE.with(|cache| cache.borrow_mut().insert(lru_index, r));
-                    r
-                })
-            })
-            .map(|target| target.is_acceptable(len))
+            .unwrap_or_else(|| {
+                let target = self.match_target(device, protocol, addr, exe);
+                MATCH_CACHE.with(|cache| cache.borrow_mut().insert(lru_index, target));
+                target
+            });
+
+        target.is_acceptable(len)
     }
-    fn match_target(
-        &self,
-        device: Device,
-        protocol: Proto,
-        addr: IpAddr,
-        exe: &str,
-    ) -> Option<RuleTarget> {
+
+    fn match_target(&self, device: Device, protocol: Proto, addr: IpAddr, exe: &str) -> RuleTarget {
         let empty = Vec::new();
         let exact_device = self.device.get(&device).unwrap_or(&empty);
         let exact_proto = self.proto.get(&protocol).unwrap_or(&empty);
@@ -213,6 +210,7 @@ impl Rules {
             })
             .min_by_key(|(id, _)| *id)
             .map(|(_, t)| t)
+            .unwrap_or(self.default_target)
     }
 }
 
