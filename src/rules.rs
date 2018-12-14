@@ -4,7 +4,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::ops::RangeInclusive;
 use std::time::{Duration, Instant};
 
 use lru_time_cache::LruCache;
@@ -101,6 +102,7 @@ struct Rule {
     device: Option<Device>,
     proto: Option<Proto>,
     exe: Option<String>,
+    port: Option<RangeInclusive<u16>>,
     v4: (Ipv4Addr, u32), // mask
     v6: (Ipv6Addr, u32),
     target: RuleTarget,
@@ -111,13 +113,14 @@ impl Rule {
         &self,
         device: Device,
         protocol: Proto,
-        addr: IpAddr,
+        addr: SocketAddr,
         exe: &str,
     ) -> Option<RuleTarget> {
         if (self.device.is_none() || device == self.device.unwrap())
             && (self.proto.is_none() || protocol == self.proto.unwrap())
             && (self.exe.is_none() || exe == self.exe.as_ref().unwrap())
-            && (match addr {
+            && (self.port.is_none() || self.port.as_ref().unwrap().contains(&addr.port()))
+            && (match addr.ip() {
                 IpAddr::V4(addr) => addr.mask(self.v4.1) == self.v4.0,
                 IpAddr::V6(addr) => addr.mask(self.v6.1) == self.v6.0,
             })
@@ -129,7 +132,7 @@ impl Rule {
     }
 }
 
-struct Rules {
+pub struct Rules {
     device: HashMap<Device, Vec<usize>>,
     any_device: Vec<usize>,
     proto: HashMap<Proto, Vec<usize>>,
@@ -140,16 +143,18 @@ struct Rules {
     any_v4: Vec<usize>,
     v6_table: IpLookupTable<Ipv6Addr, Vec<usize>>,
     any_v6: Vec<usize>,
+    port: HashMap<u16, Vec<usize>>,
+    any_port: Vec<usize>,
     raw: Vec<Rule>,
     default_target: RuleTarget,
 }
 
 impl Rules {
     pub fn is_acceptable(
-        &mut self,
+        &self,
         device: Device,
         protocol: Proto,
-        addr: IpAddr,
+        addr: SocketAddr,
         len: usize,
         exe: &str,
     ) -> bool {
@@ -168,12 +173,19 @@ impl Rules {
         target.is_acceptable(len)
     }
 
-    fn match_target(&self, device: Device, protocol: Proto, addr: IpAddr, exe: &str) -> RuleTarget {
+    fn match_target(
+        &self,
+        device: Device,
+        protocol: Proto,
+        addr: SocketAddr,
+        exe: &str,
+    ) -> RuleTarget {
         let empty = Vec::new();
         let exact_device = self.device.get(&device).unwrap_or(&empty);
         let exact_proto = self.proto.get(&protocol).unwrap_or(&empty);
         let exact_exe = self.exe.get(exe).unwrap_or(&empty);
-        let (exact_ip, any_ip) = match addr {
+        let exact_port = self.port.get(&addr.port()).unwrap_or(&empty);
+        let (exact_ip, any_ip) = match addr.ip() {
             IpAddr::V4(ip) => (
                 self.v4_table
                     .longest_match(ip)
@@ -193,6 +205,7 @@ impl Rules {
             (exact_device, &self.any_device),
             (exact_proto, &self.any_proto),
             (exact_exe, &self.any_exe),
+            (exact_port, &self.any_port),
             (exact_ip, any_ip),
         ];
         let (exact, any) = list
