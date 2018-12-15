@@ -98,13 +98,13 @@ impl RuleTarget {
 }
 
 // dbus
+#[derive(Clone)]
 struct Rule {
     device: Option<Device>,
     proto: Option<Proto>,
     exe: Option<String>,
     port: Option<RangeInclusive<u16>>,
-    v4: (Ipv4Addr, u32), // mask
-    v6: (Ipv6Addr, u32),
+    subnet: (IpAddr, u32), // mask
     target: RuleTarget,
 }
 
@@ -120,9 +120,11 @@ impl Rule {
             && (self.proto.is_none() || protocol == self.proto.unwrap())
             && (self.exe.is_none() || exe == self.exe.as_ref().unwrap())
             && (self.port.is_none() || self.port.as_ref().unwrap().contains(&addr.port()))
-            && (match addr.ip() {
-                IpAddr::V4(addr) => addr.mask(self.v4.1) == self.v4.0,
-                IpAddr::V6(addr) => addr.mask(self.v6.1) == self.v6.0,
+            && addr.is_ipv4() == self.subnet.0.is_ipv4()
+            && (match (addr.ip(), self.subnet) {
+                (IpAddr::V4(addr), (IpAddr::V4(subnet), mask)) => addr.mask(mask) == subnet,
+                (IpAddr::V6(addr), (IpAddr::V6(subnet), mask)) => addr.mask(mask) == subnet,
+                _ => unreachable!(),
             })
         {
             Some(self.target)
@@ -224,6 +226,83 @@ impl Rules {
             .min_by_key(|(id, _)| *id)
             .map(|(_, t)| t)
             .unwrap_or(self.default_target)
+    }
+}
+
+macro_rules! insert_rule {
+    ($target: tt, $rule: tt, $name: tt, $any: tt,  $index: tt) => {
+        if let Some(k) = $rule.$name {
+            $target.$name.entry(k).or_default().push($index);
+        } else {
+            $target.$any.push($index);
+        }
+    };
+}
+
+impl From<Vec<Rule>> for Rules {
+    fn from(rules: Vec<Rule>) -> Self {
+        let mut r = Self {
+            device: Default::default(),
+            any_device: Default::default(),
+            proto: Default::default(),
+            any_proto: Default::default(),
+            exe: Default::default(),
+            any_exe: Default::default(),
+            v4_table: IpLookupTable::new(),
+            any_v4: Default::default(),
+            v6_table: IpLookupTable::new(),
+            any_v6: Default::default(),
+            port: Default::default(),
+            any_port: Default::default(),
+            raw: rules[1..].to_vec(),
+            default_target: RuleTarget::Accept,
+        };
+        let mut rules = rules.into_iter();
+        // The default rule is rules[0]
+        let default_rule = rules.next().expect("");
+
+        // Other fields of default rule must be empty
+        debug_assert!(default_rule.device.is_none());
+        debug_assert!(default_rule.proto.is_none());
+        debug_assert!(default_rule.exe.is_none());
+        debug_assert!(default_rule.port.is_none());
+        debug_assert!(default_rule.subnet.0.is_unspecified());
+        debug_assert_eq!(default_rule.subnet.1, 0);
+
+        r.default_target = default_rule.target;
+
+        let mut v4_hashmap: HashMap<(Ipv4Addr, u32), Vec<usize>> = HashMap::new();
+        let mut v6_hashmap: HashMap<(Ipv6Addr, u32), Vec<usize>> = HashMap::new();
+
+        for (index, rule) in rules.enumerate() {
+            insert_rule!(r, rule, device, any_device, index);
+            insert_rule!(r, rule, proto, any_proto, index);
+            insert_rule!(r, rule, exe, any_exe, index);
+            if let Some(port_range) = rule.port {
+                for port in port_range {
+                    r.port.entry(port).or_default().push(index);
+                }
+            } else {
+                r.any_port.push(index);
+            }
+            match rule.subnet {
+                (IpAddr::V4(subnet), mask) => {
+                    v4_hashmap.entry((subnet, mask)).or_default().push(index);
+                }
+                (IpAddr::V6(subnet), mask) => {
+                    v6_hashmap.entry((subnet, mask)).or_default().push(index);
+                }
+            }
+        }
+
+        for ((ip, masklen), index) in v4_hashmap {
+            r.v4_table.insert(ip, masklen, index);
+        }
+        for ((ip, masklen), index) in v6_hashmap {
+            r.v6_table.insert(ip, masklen, index);
+        }
+
+        r
     }
 }
 
