@@ -79,7 +79,7 @@ struct DbusRules(Vec<Rule>);
 // impl From<DbusRules> for Rules {}
 
 // dbus
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum RuleTarget {
     Accept,
     Drop,
@@ -98,7 +98,7 @@ impl RuleTarget {
 }
 
 // dbus
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Rule {
     device: Option<Device>,
     proto: Option<Proto>,
@@ -287,10 +287,16 @@ impl From<Vec<Rule>> for Rules {
             }
             match rule.subnet {
                 (IpAddr::V4(subnet), mask) => {
-                    v4_hashmap.entry((subnet, mask)).or_default().push(index);
+                    v4_hashmap
+                        .entry((subnet.mask(mask), mask))
+                        .or_default()
+                        .push(index);
                 }
                 (IpAddr::V6(subnet), mask) => {
-                    v6_hashmap.entry((subnet, mask)).or_default().push(index);
+                    v6_hashmap
+                        .entry((subnet.mask(mask), mask))
+                        .or_default()
+                        .push(index);
                 }
             }
         }
@@ -401,5 +407,95 @@ impl Address for Ipv6Addr {
             };
             unsafe { mem::transmute((first, masked.to_be())) }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn rules_indexing() {
+        let raw_rules = vec![
+            Rule {
+                device: None,
+                proto: None,
+                exe: None,
+                port: None,
+                subnet: ([0, 0, 0, 0].into(), 0),
+                target: RuleTarget::Drop,
+            },
+            Rule {
+                device: Some(Device::Input),
+                proto: None,
+                exe: None,
+                port: None,
+                subnet: ([1, 1, 1, 1].into(), 32),
+                target: RuleTarget::Accept,
+            },
+            Rule {
+                device: Some(Device::Input),
+                proto: Some(Proto::Tcp),
+                exe: None,
+                port: None,
+                subnet: ([1, 1, 1, 1].into(), 32),
+                target: RuleTarget::Accept,
+            },
+            Rule {
+                device: Some(Device::Input),
+                proto: Some(Proto::Tcp),
+                exe: None,
+                port: None,
+                subnet: ([2, 2, 2, 2].into(), 30),
+                target: RuleTarget::Accept,
+            },
+            Rule {
+                device: Some(Device::Input),
+                proto: None,
+                exe: Some("".into()),
+                port: Some(RangeInclusive::new(10, 200)),
+                subnet: ([2, 2, 2, 2].into(), 32),
+                target: RuleTarget::Accept,
+            },
+            Rule {
+                device: Some(Device::Input),
+                proto: None,
+                exe: Some("".into()),
+                port: Some(RangeInclusive::new(100, 100)),
+                subnet: ([0, 0, 0, 0].into(), 0),
+                target: RuleTarget::Accept,
+            },
+        ];
+
+        let mut device = HashMap::new();
+        device.insert(Device::Input, vec![0, 1, 2, 3, 4]);
+        let mut proto = HashMap::new();
+        proto.insert(Proto::Tcp, vec![1, 2]);
+        let mut exe = HashMap::new();
+        exe.insert("".into(), vec![3, 4]);
+        let mut port = HashMap::new();
+        for p in 10..=200 {
+            port.insert(p, vec![3]);
+        }
+        port.get_mut(&100).unwrap().push(4);
+        let mut v4_hashmap = HashMap::new();
+        v4_hashmap.insert(([1, 1, 1, 1], 32), vec![0, 1]);
+        v4_hashmap.insert(([2, 2, 2, 2], 30), vec![2]);
+        v4_hashmap.insert(([2, 2, 2, 2], 32), vec![3]);
+        v4_hashmap.insert(([0, 0, 0, 0], 0), vec![4]);
+
+        let r: Rules = raw_rules.clone().into();
+        assert_eq!(r.device, device);
+        assert_eq!(r.any_device, vec![]);
+        assert_eq!(r.proto, proto);
+        assert_eq!(r.any_proto, vec![0, 3, 4]);
+        assert_eq!(r.exe, exe);
+        assert_eq!(r.any_exe, vec![0, 1, 2]);
+        assert_eq!(r.port, port);
+        assert_eq!(r.any_port, vec![0, 1, 2]);
+        assert_eq!(r.raw, raw_rules[1..].to_vec());
+        assert_eq!(r.default_target, RuleTarget::Drop);
+
+        assert!(r.is_acceptable(Device::Input, Proto::Tcp, ([2, 2, 2, 2], 100).into(), 0, "",));
     }
 }
