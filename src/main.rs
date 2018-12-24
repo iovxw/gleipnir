@@ -1,7 +1,7 @@
-#![feature(nll)]
 #![feature(const_fn)]
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::thread;
 
 use libc;
 use nfqueue;
@@ -11,24 +11,17 @@ use pnet::packet::{
 
 #[macro_use]
 mod utils;
+mod ablock;
 mod netlink;
 mod proc;
 mod rules;
-mod ablock;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
 
 struct State {
     diag: netlink::SockDiag,
-}
-
-impl State {
-    pub fn new() -> State {
-        State {
-            diag: netlink::SockDiag::new().expect(""),
-        }
-    }
+    rules: ablock::AbReader<rules::Rules>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
@@ -187,11 +180,26 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
         proc.exe,
     );
 
-    msg.set_verdict(nfqueue::Verdict::Accept);
+    let rules = state.rules.read();
+    if rules.is_acceptable(device, protocol, src, payload.len(), &proc.exe) {
+        msg.set_verdict(nfqueue::Verdict::Accept);
+    } else {
+        msg.set_verdict(nfqueue::Verdict::Drop);
+    }
 }
 
 fn main() {
-    let mut q = nfqueue::Queue::new(State::new());
+    let (rules, rules_setter) = ablock::AbLock::new(unsafe { std::mem::zeroed() });
+    let state = State {
+        diag: netlink::SockDiag::new().expect(""),
+        rules,
+    };
+    let mut q = nfqueue::Queue::new(state);
+
+    thread::spawn(|| {
+        // TODO: start a dbus server
+        std::mem::drop(rules_setter);
+    });
 
     q.open();
     q.unbind(libc::AF_INET); // ignore result, failure is not critical here
