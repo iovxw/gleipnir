@@ -14,26 +14,6 @@ use treebitmap::IpLookupTable;
 use crate::netlink::Proto;
 use crate::Device;
 
-thread_local! {
-    static QOS_STATE: RefCell<Vec<Bucket>> = RefCell::new(Vec::new());
-    static MATCH_CACHE: RefCell<LruCache<u64, RuleTarget>> =
-        RefCell::new(LruCache::with_capacity(2048));
-}
-
-// When Rules changed, call this
-pub fn refresh_local(qos_rules: Vec<usize>) {
-    QOS_STATE.with(|rules| {
-        let mut rules = rules.borrow_mut();
-        rules.clear();
-        for limit in qos_rules {
-            rules.push(Bucket::new(limit));
-        }
-    });
-    MATCH_CACHE.with(|cache| {
-        cache.borrow_mut().clear();
-    });
-}
-
 struct Bucket {
     bytes: usize,
     timestamp: Instant,
@@ -69,37 +49,16 @@ impl Bucket {
 }
 
 // dbus
-struct QosRules(Vec<usize>);
-
-// impl From<QosRules> for QOS_STATE
-
-// dbus
-struct DbusRules(Vec<Rule>);
-
-// impl From<DbusRules> for Rules {}
-
-// dbus
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum RuleTarget {
+pub enum RuleTarget {
     Accept,
     Drop,
     Qos(usize), // index to QosRules
 }
 
-impl RuleTarget {
-    fn is_acceptable(&self, pkt_size: usize) -> bool {
-        use RuleTarget::*;
-        match *self {
-            Accept => true,
-            Drop => false,
-            Qos(qos_id) => QOS_STATE.with(|rules| rules.borrow_mut()[qos_id].stuff(pkt_size)),
-        }
-    }
-}
-
 // dbus
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Rule {
+pub struct Rule {
     device: Option<Device>,
     proto: Option<Proto>,
     exe: Option<String>,
@@ -145,13 +104,90 @@ pub struct Rules {
     any_v4: Vec<usize>,
     v6_table: IpLookupTable<Ipv6Addr, Vec<usize>>,
     any_v6: Vec<usize>,
+    // TODO: better memory usage
     port: HashMap<u16, Vec<usize>>,
     any_port: Vec<usize>,
     raw: Vec<Rule>,
     default_target: RuleTarget,
+    qos_state: RefCell<Vec<Bucket>>,
+    cache: RefCell<LruCache<u64, RuleTarget>>,
 }
 
 impl Rules {
+    pub fn new(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>) -> Self {
+        macro_rules! insert_rule {
+            ($target: tt, $rule: tt, $name: tt, $any: tt,  $index: tt) => {
+                if let Some(k) = $rule.$name {
+                    $target.$name.entry(k).or_default().push($index);
+                } else {
+                    $target.$any.push($index);
+                }
+            };
+        }
+
+        let mut r = Self {
+            device: Default::default(),
+            any_device: Default::default(),
+            proto: Default::default(),
+            any_proto: Default::default(),
+            exe: Default::default(),
+            any_exe: Default::default(),
+            v4_table: IpLookupTable::new(),
+            any_v4: Default::default(),
+            v6_table: IpLookupTable::new(),
+            any_v6: Default::default(),
+            port: Default::default(),
+            any_port: Default::default(),
+            raw: rules.clone(),
+            default_target: default_target,
+            qos_state: Default::default(),
+            cache: RefCell::new(LruCache::with_capacity(2048)),
+        };
+
+        for limit in qos_rules {
+            r.qos_state.borrow_mut().push(Bucket::new(limit));
+        }
+
+        let mut v4_hashmap: HashMap<(Ipv4Addr, u32), Vec<usize>> = HashMap::new();
+        let mut v6_hashmap: HashMap<(Ipv6Addr, u32), Vec<usize>> = HashMap::new();
+
+        for (index, rule) in rules.into_iter().enumerate() {
+            insert_rule!(r, rule, device, any_device, index);
+            insert_rule!(r, rule, proto, any_proto, index);
+            insert_rule!(r, rule, exe, any_exe, index);
+            if let Some(port_range) = rule.port {
+                for port in port_range {
+                    r.port.entry(port).or_default().push(index);
+                }
+            } else {
+                r.any_port.push(index);
+            }
+            match rule.subnet {
+                (IpAddr::V4(subnet), mask) => {
+                    v4_hashmap
+                        .entry((subnet.mask(mask), mask))
+                        .or_default()
+                        .push(index);
+                }
+                (IpAddr::V6(subnet), mask) => {
+                    v6_hashmap
+                        .entry((subnet.mask(mask), mask))
+                        .or_default()
+                        .push(index);
+                }
+            }
+        }
+
+        for ((ip, masklen), index) in v4_hashmap {
+            r.v4_table.insert(ip, masklen, index);
+        }
+        for ((ip, masklen), index) in v6_hashmap {
+            r.v6_table.insert(ip, masklen, index);
+        }
+
+        r
+    }
+
     pub fn is_acceptable(
         &self,
         device: Device,
@@ -164,15 +200,22 @@ impl Rules {
         (device, protocol, addr, exe).hash(&mut hasher);
         let lru_index = hasher.finish();
 
-        let target = MATCH_CACHE
-            .with(|cache| cache.borrow_mut().get(&lru_index).cloned())
+        let target = self
+            .cache
+            .borrow_mut()
+            .get(&lru_index)
+            .cloned()
             .unwrap_or_else(|| {
                 let target = self.match_target(device, protocol, addr, exe);
-                MATCH_CACHE.with(|cache| cache.borrow_mut().insert(lru_index, target));
+                self.cache.borrow_mut().insert(lru_index, target);
                 target
             });
 
-        target.is_acceptable(len)
+        match target {
+            RuleTarget::Accept => true,
+            RuleTarget::Drop => false,
+            RuleTarget::Qos(qos_id) => self.qos_state.borrow_mut()[qos_id].stuff(len),
+        }
     }
 
     fn match_target(
@@ -226,89 +269,6 @@ impl Rules {
             .min_by_key(|(id, _)| *id)
             .map(|(_, t)| t)
             .unwrap_or(self.default_target)
-    }
-}
-
-macro_rules! insert_rule {
-    ($target: tt, $rule: tt, $name: tt, $any: tt,  $index: tt) => {
-        if let Some(k) = $rule.$name {
-            $target.$name.entry(k).or_default().push($index);
-        } else {
-            $target.$any.push($index);
-        }
-    };
-}
-
-impl From<Vec<Rule>> for Rules {
-    fn from(rules: Vec<Rule>) -> Self {
-        let mut r = Self {
-            device: Default::default(),
-            any_device: Default::default(),
-            proto: Default::default(),
-            any_proto: Default::default(),
-            exe: Default::default(),
-            any_exe: Default::default(),
-            v4_table: IpLookupTable::new(),
-            any_v4: Default::default(),
-            v6_table: IpLookupTable::new(),
-            any_v6: Default::default(),
-            port: Default::default(),
-            any_port: Default::default(),
-            raw: rules[1..].to_vec(),
-            default_target: RuleTarget::Accept,
-        };
-        let mut rules = rules.into_iter();
-        // The default rule is rules[0]
-        let default_rule = rules.next().expect("");
-
-        // Other fields of default rule must be empty
-        debug_assert!(default_rule.device.is_none());
-        debug_assert!(default_rule.proto.is_none());
-        debug_assert!(default_rule.exe.is_none());
-        debug_assert!(default_rule.port.is_none());
-        debug_assert!(default_rule.subnet.0.is_unspecified());
-        debug_assert_eq!(default_rule.subnet.1, 0);
-
-        r.default_target = default_rule.target;
-
-        let mut v4_hashmap: HashMap<(Ipv4Addr, u32), Vec<usize>> = HashMap::new();
-        let mut v6_hashmap: HashMap<(Ipv6Addr, u32), Vec<usize>> = HashMap::new();
-
-        for (index, rule) in rules.enumerate() {
-            insert_rule!(r, rule, device, any_device, index);
-            insert_rule!(r, rule, proto, any_proto, index);
-            insert_rule!(r, rule, exe, any_exe, index);
-            if let Some(port_range) = rule.port {
-                for port in port_range {
-                    r.port.entry(port).or_default().push(index);
-                }
-            } else {
-                r.any_port.push(index);
-            }
-            match rule.subnet {
-                (IpAddr::V4(subnet), mask) => {
-                    v4_hashmap
-                        .entry((subnet.mask(mask), mask))
-                        .or_default()
-                        .push(index);
-                }
-                (IpAddr::V6(subnet), mask) => {
-                    v6_hashmap
-                        .entry((subnet.mask(mask), mask))
-                        .or_default()
-                        .push(index);
-                }
-            }
-        }
-
-        for ((ip, masklen), index) in v4_hashmap {
-            r.v4_table.insert(ip, masklen, index);
-        }
-        for ((ip, masklen), index) in v6_hashmap {
-            r.v6_table.insert(ip, masklen, index);
-        }
-
-        r
     }
 }
 
@@ -418,14 +378,6 @@ mod test {
     fn rules_indexing() {
         let raw_rules = vec![
             Rule {
-                device: None,
-                proto: None,
-                exe: None,
-                port: None,
-                subnet: ([0, 0, 0, 0].into(), 0),
-                target: RuleTarget::Drop,
-            },
-            Rule {
                 device: Some(Device::Input),
                 proto: None,
                 exe: None,
@@ -484,7 +436,7 @@ mod test {
         v4_hashmap.insert(([2, 2, 2, 2], 32), vec![3]);
         v4_hashmap.insert(([0, 0, 0, 0], 0), vec![4]);
 
-        let r: Rules = raw_rules.clone().into();
+        let r: Rules = Rules::new(RuleTarget::Drop, raw_rules.clone(), vec![]);
         assert_eq!(r.device, device);
         assert_eq!(r.any_device, vec![]);
         assert_eq!(r.proto, proto);
