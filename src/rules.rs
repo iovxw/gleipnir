@@ -110,7 +110,7 @@ pub struct Rules {
     raw: Vec<Rule>,
     default_target: RuleTarget,
     qos_state: RefCell<Vec<Bucket>>,
-    cache: RefCell<LruCache<u64, RuleTarget>>,
+    cache: RefCell<LruCache<u64, (Option<usize>, RuleTarget)>>,
 }
 
 impl Rules {
@@ -195,27 +195,28 @@ impl Rules {
         addr: SocketAddr,
         len: usize,
         exe: &str,
-    ) -> bool {
+    ) -> (Option<usize>, bool) {
         let mut hasher = DefaultHasher::new();
         (device, protocol, addr, exe).hash(&mut hasher);
         let lru_index = hasher.finish();
 
-        let target = self
+        let (rule_id, target) = self
             .cache
             .borrow_mut()
             .get(&lru_index)
             .cloned()
             .unwrap_or_else(|| {
-                let target = self.match_target(device, protocol, addr, exe);
-                self.cache.borrow_mut().insert(lru_index, target);
-                target
+                let result = self.match_target(device, protocol, addr, exe);
+                self.cache.borrow_mut().insert(lru_index, result);
+                result
             });
 
-        match target {
+        let accept = match target {
             RuleTarget::Accept => true,
             RuleTarget::Drop => false,
             RuleTarget::Qos(qos_id) => self.qos_state.borrow_mut()[qos_id].stuff(len),
-        }
+        };
+        (rule_id, accept)
     }
 
     fn match_target(
@@ -224,7 +225,7 @@ impl Rules {
         protocol: Proto,
         addr: SocketAddr,
         exe: &str,
-    ) -> RuleTarget {
+    ) -> (Option<usize>, RuleTarget) {
         let empty = Vec::new();
         let exact_device = self.device.get(&device).unwrap_or(&empty);
         let exact_proto = self.proto.get(&protocol).unwrap_or(&empty);
@@ -267,8 +268,8 @@ impl Rules {
                     .map(|t| (id, t))
             })
             .min_by_key(|(id, _)| *id)
-            .map(|(_, t)| t)
-            .unwrap_or(self.default_target)
+            .map(|(id, t)| (Some(id), t))
+            .unwrap_or((None, self.default_target))
     }
 }
 
