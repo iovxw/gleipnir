@@ -12,6 +12,7 @@ use pnet::packet::{
 #[macro_use]
 mod utils;
 mod ablock;
+mod dbus_interface;
 mod netlink;
 mod proc;
 mod rules;
@@ -25,7 +26,7 @@ struct State {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
-enum Device {
+pub enum Device {
     Input,
     Ouput,
 }
@@ -181,7 +182,16 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
     );
 
     let rules = state.rules.read();
-    if rules.is_acceptable(device, protocol, src, payload.len(), &proc.exe) {
+    let (rule_id, accept) = rules.is_acceptable(
+        device,
+        protocol,
+        if device.is_input() { src } else { dst },
+        payload.len(),
+        &proc.exe,
+    );
+    dbg!(rule_id, accept);
+    // TODO: write result to logs
+    if accept {
         msg.set_verdict(nfqueue::Verdict::Accept);
     } else {
         msg.set_verdict(nfqueue::Verdict::Drop);
