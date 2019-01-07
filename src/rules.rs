@@ -200,16 +200,12 @@ impl Rules {
         (device, protocol, addr, exe).hash(&mut hasher);
         let lru_index = hasher.finish();
 
-        let (rule_id, target) = self
-            .cache
-            .borrow_mut()
-            .get(&lru_index)
-            .cloned()
-            .unwrap_or_else(|| {
-                let result = self.match_target(device, protocol, addr, exe);
-                self.cache.borrow_mut().insert(lru_index, result);
-                result
-            });
+        let mut cache = self.cache.borrow_mut();
+        let (rule_id, target) = cache.get(&lru_index).cloned().unwrap_or_else(|| {
+            let result = self.match_target(device, protocol, addr, exe);
+            cache.insert(lru_index, result);
+            result
+        });
 
         let accept = match target {
             RuleTarget::Accept => true,
@@ -446,9 +442,12 @@ mod test {
         assert_eq!(r.any_exe, vec![0, 1, 2]);
         assert_eq!(r.port, port);
         assert_eq!(r.any_port, vec![0, 1, 2]);
-        assert_eq!(r.raw, raw_rules[1..].to_vec());
+        assert_eq!(r.raw, raw_rules);
         assert_eq!(r.default_target, RuleTarget::Drop);
 
-        assert!(r.is_acceptable(Device::Input, Proto::Tcp, ([2, 2, 2, 2], 100).into(), 0, "",));
+        assert_eq!(
+            r.is_acceptable(Device::Input, Proto::Tcp, ([2, 2, 2, 2], 100).into(), 0, "",),
+            (Some(3), true)
+        );
     }
 }
