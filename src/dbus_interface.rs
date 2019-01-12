@@ -5,12 +5,7 @@ use crate::rules::{Rule, RuleTarget};
 use crate::Device;
 
 trait GleiphierDaemon {
-    fn set_rules(
-        default_target: crate::rules::RuleTarget,
-        rules: Vec<crate::rules::Rule>,
-        qos_rules: Vec<usize>,
-    ) {
-    }
+    fn set_rules(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>) {}
     fn register_monitor(dbus_path: String) {}
 }
 
