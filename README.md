@@ -1,4 +1,4 @@
-# gleiphir [![Build Status](https://travis-ci.com/iovxw/gleiphir.svg?branch=master)](https://travis-ci.com/iovxw/gleiphir)
+# gleipnir [![Build Status](https://travis-ci.com/iovxw/gleipnir.svg?branch=master)](https://travis-ci.com/iovxw/gleipnir)
 
 ## License
 
