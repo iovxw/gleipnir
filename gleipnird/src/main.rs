@@ -12,7 +12,7 @@ use pnet::packet::{
 #[macro_use]
 mod utils;
 mod ablock;
-mod dbus_interface;
+pub mod dbus_interface;
 mod netlink;
 mod proc;
 mod rules;
@@ -208,6 +208,7 @@ fn main() {
 
     thread::spawn(|| {
         // TODO: start a dbus server
+        crate::dbus_interface::check_authorization(2137);
         std::mem::drop(rules_setter);
     });
 
