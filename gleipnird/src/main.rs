@@ -208,6 +208,7 @@ fn main() {
 
     thread::spawn(|| {
         // TODO: start a dbus server
+        dbus_interface::run_server();
         crate::dbus_interface::check_authorization(2137);
         std::mem::drop(rules_setter);
     });

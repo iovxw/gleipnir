@@ -14,6 +14,7 @@ lazy_static = "1.0"
 treebitmap = "0.3"
 lru_time_cache = "0.9"
 dbus = "0.6"
+nix = "0.13"
 
 [build-dependencies]
 dbus-codegen = "0.3"

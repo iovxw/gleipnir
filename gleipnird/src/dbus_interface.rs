@@ -1,10 +1,13 @@
+use std::collections::HashMap;
 use std::fs;
 use std::net::SocketAddr;
-
-use std::collections::HashMap;
+use std::os::unix::fs::PermissionsExt;
+use std::os::unix::io::AsRawFd;
+use std::os::unix::net::{UnixListener, UnixStream};
 
 use dbus::arg::{RefArg, Variant};
 use dbus::{BusType, Connection};
+use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 
 use crate::netlink::Proto;
 use crate::rules::{Rule, RuleTarget};
@@ -68,4 +71,26 @@ pub fn check_authorization(pid: u32) -> bool {
         .unwrap();
     dbg!(is_authorized, is_challenge, details);
     is_authorized
+}
+
+pub fn run_server() -> Result<(), std::io::Error> {
+    let addr = std::path::PathBuf::from("/tmp/gleipnir");
+    if addr.exists() {
+        if UnixStream::connect(&addr).is_ok() {
+            return Err(std::io::ErrorKind::AddrInUse.into());
+        } else {
+            fs::remove_file(&addr)?;
+        }
+    }
+    let listener = UnixListener::bind(&addr)?;
+    let permissions = fs::Permissions::from_mode(755);
+    fs::set_permissions(&addr, permissions)?;
+    for stream in listener.incoming() {
+        let stream = stream?;
+        let pid = getsockopt(stream.as_raw_fd(), PeerCredentials)
+            .unwrap()
+            .pid();
+        check_authorization(pid as u32);
+    }
+    Ok(())
 }
