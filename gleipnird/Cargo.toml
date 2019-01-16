@@ -15,6 +15,9 @@ treebitmap = "0.3"
 lru_time_cache = "0.9"
 dbus = "0.6"
 nix = "0.13"
+tarpc = "0.18"
+rpc = { package = "tarpc-lib", version = "0.6" }
+futures-preview = { version = "0.3.0-alpha.16", features = ["compat"] }
 
 [build-dependencies]
 dbus-codegen = "0.3"

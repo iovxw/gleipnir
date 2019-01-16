@@ -1,4 +1,7 @@
 #![feature(const_fn)]
+#![feature(async_await)]
+#![feature(existential_type)]
+#![feature(proc_macro_hygiene)]
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::thread;
@@ -12,10 +15,11 @@ use pnet::packet::{
 #[macro_use]
 mod utils;
 mod ablock;
-pub mod dbus_interface;
+mod rpc_server;
 mod netlink;
 mod proc;
 mod rules;
+mod polkit;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
@@ -208,8 +212,7 @@ fn main() {
 
     thread::spawn(|| {
         // TODO: start a dbus server
-        dbus_interface::run_server();
-        crate::dbus_interface::check_authorization(2137);
+        rpc_server::run();
         std::mem::drop(rules_setter);
     });
 
