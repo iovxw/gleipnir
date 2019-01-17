@@ -15,9 +15,14 @@ treebitmap = "0.3"
 lru_time_cache = "0.9"
 dbus = "0.6"
 nix = "0.13"
-tarpc = "0.18"
+tarpc = { version = "0.18",  features = ["serde1"] }
 rpc = { package = "tarpc-lib", version = "0.6" }
+bincode-transport = { package = "tarpc-bincode-transport", version = "0.7" }
 futures-preview = { version = "0.3.0-alpha.16", features = ["compat"] }
+tokio = "0.1"
+async-bincode = "0.4"
+pin-utils = "0.1.0-alpha.4"
+serde = { version = "1.0", features = ["derive"] }
 
 [build-dependencies]
 dbus-codegen = "0.3"

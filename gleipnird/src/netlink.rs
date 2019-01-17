@@ -5,6 +5,7 @@ use pnetlink::{
     packet::netlink::{NetlinkMsgFlags, NetlinkReader, NetlinkRequestBuilder},
     socket::{NetlinkProtocol, NetlinkSocket},
 };
+use serde::{Serialize, Deserialize};
 
 pub struct SockDiag {
     socket: NetlinkSocket,
@@ -284,7 +285,7 @@ impl fmt::Debug for Ipv4or6 {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum Proto {
     Tcp = libc::IPPROTO_TCP as isize,
     Udp = libc::IPPROTO_UDP as isize,

@@ -9,6 +9,7 @@ use std::ops::RangeInclusive;
 use std::time::{Duration, Instant};
 
 use lru_time_cache::LruCache;
+use serde::{Deserialize, Serialize};
 use treebitmap::IpLookupTable;
 
 use crate::netlink::Proto;
@@ -49,7 +50,7 @@ impl Bucket {
 }
 
 // dbus
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RuleTarget {
     Accept,
     Drop,
@@ -57,11 +58,12 @@ pub enum RuleTarget {
 }
 
 // dbus
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Rule {
     device: Option<Device>,
     proto: Option<Proto>,
     exe: Option<String>,
+    #[serde(with = "rangeinclusive_serde")]
     port: Option<RangeInclusive<u16>>,
     subnet: (IpAddr, u32), // mask
     target: RuleTarget,
@@ -364,6 +366,47 @@ impl Address for Ipv6Addr {
             };
             unsafe { mem::transmute((first, masked.to_be())) }
         }
+    }
+}
+
+mod rangeinclusive_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::ops::RangeInclusive;
+
+    #[derive(Serialize)]
+    pub struct RangeInclusiveRef<'a, Idx> {
+        start: &'a Idx,
+        end: &'a Idx,
+    }
+    #[derive(Deserialize)]
+    pub struct RangeInclusiveOwned<Idx> {
+        start: Idx,
+        end: Idx,
+    }
+
+    pub fn serialize<'a, S, Idx: 'a>(
+        this: &Option<RangeInclusive<Idx>>,
+        ser: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        Idx: Serialize,
+        S: Serializer,
+    {
+        let r = this.as_ref().map(|range| RangeInclusiveRef {
+            start: range.start(),
+            end: range.end(),
+        });
+        <Option<RangeInclusiveRef<Idx>> as Serialize>::serialize(&r, ser)
+    }
+
+    pub fn deserialize<'de, D, Idx>(de: D) -> Result<Option<RangeInclusive<Idx>>, D::Error>
+    where
+        Idx: Deserialize<'de>,
+        D: Deserializer<'de>,
+    {
+        let r = <Option<RangeInclusiveOwned<Idx>> as Deserialize>::deserialize(de)?
+            .map(|range| RangeInclusive::new(range.start, range.end));
+        Ok(r)
     }
 }
 

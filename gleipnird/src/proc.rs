@@ -83,7 +83,8 @@ fn add_new_proc_to_cache() {
                 Ok(pid) => Some((e, pid)),
                 _ => None,
             }
-        }) {
+        })
+    {
         if garbage.remove(&pid) {
             old.insert(pid);
         } else {

@@ -6,6 +6,7 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use futures::{
+    compat::Executor01CompatExt,
     future::{self, Ready},
     prelude::*,
     Future,
@@ -13,12 +14,13 @@ use futures::{
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 use rpc::context;
 use rpc::server::{self, Handler, Server};
+use serde::{Deserialize, Serialize};
 
 use crate::netlink::Proto;
 use crate::rules::{Rule, RuleTarget};
 use crate::Device;
 
-mod daemon {
+pub mod daemon {
     use crate::rules::{Rule, RuleTarget};
     tarpc::service! {
         rpc set_rules(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>);
@@ -35,14 +37,14 @@ mod monitor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ProcTraffic {
     exe: String,
     receiving: usize,
     sending: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct PackageReport {
     device: Device,
     protocol: Proto,
@@ -87,15 +89,18 @@ pub fn run() -> Result<(), std::io::Error> {
             fs::remove_file(&addr)?;
         }
     }
-    let listener = UnixListener::bind(&addr)?;
+
+    let transport = crate::unixtransport::listen(&addr)?;
+
     let permissions = fs::Permissions::from_mode(755);
     fs::set_permissions(&addr, permissions)?;
-    for stream in listener.incoming() {
-        let stream = stream?;
-        let pid = getsockopt(stream.as_raw_fd(), PeerCredentials)
-            .unwrap()
-            .pid();
-        crate::polkit::check_authorization(pid as u32);
-    }
+
+    let server = Server::default()
+        .incoming(transport)
+        .respond_with(daemon::serve(Daemon));
+
+    rpc::init(tokio::executor::DefaultExecutor::current().compat());
+    tokio::run(server.unit_error().boxed().compat());
+
     Ok(())
 }

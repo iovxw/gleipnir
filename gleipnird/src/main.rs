@@ -11,15 +11,17 @@ use nfqueue;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
 };
+use serde::{Serialize, Deserialize};
 
 #[macro_use]
 mod utils;
 mod ablock;
-mod rpc_server;
 mod netlink;
-mod proc;
-mod rules;
 mod polkit;
+mod proc;
+pub mod rpc_server;
+mod rules;
+mod unixtransport;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
@@ -29,7 +31,7 @@ struct State {
     rules: ablock::AbReader<rules::Rules>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum Device {
     Input,
     Ouput,

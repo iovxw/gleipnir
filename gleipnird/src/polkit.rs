@@ -1,5 +1,5 @@
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
 
 use dbus::arg::{RefArg, Variant};
 use dbus::{BusType, Connection};
