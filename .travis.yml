@@ -5,3 +5,4 @@ addons:
   apt:
     packages:
     - libnetfilter-queue-dev
+    - libdbus-1-dev
