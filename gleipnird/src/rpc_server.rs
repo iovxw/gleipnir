@@ -6,7 +6,7 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use futures::{
-    compat::Executor01CompatExt,
+    compat::{Compat, Executor01CompatExt},
     future::{self, Ready},
     prelude::*,
     Future,
@@ -56,7 +56,10 @@ struct PackageReport {
 }
 
 #[derive(Clone)]
-struct Daemon;
+struct Daemon {
+    pid: u32,
+    authenticated: bool,
+}
 
 impl daemon::Service for Daemon {
     type SetRulesFut = Ready<()>;
@@ -95,9 +98,28 @@ pub fn run() -> Result<(), std::io::Error> {
     let permissions = fs::Permissions::from_mode(755);
     fs::set_permissions(&addr, permissions)?;
 
-    let server = Server::default()
-        .incoming(transport)
-        .respond_with(daemon::serve(Daemon));
+    let server = Server::default().incoming(transport).for_each(|channel| {
+        let channel = channel.unwrap();
+        let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
+            (*addr.ip()).into()
+        } else {
+            unreachable!()
+        };
+
+        tokio::executor::spawn(Compat::new(
+            async move {
+                channel
+                    .respond_with(daemon::serve(Daemon {
+                        pid,
+                        authenticated: false,
+                    }))
+                    .await;
+                Ok(())
+            }
+                .boxed(),
+        ));
+        future::ready(())
+    });
 
     rpc::init(tokio::executor::DefaultExecutor::current().compat());
     tokio::run(server.unit_error().boxed().compat());

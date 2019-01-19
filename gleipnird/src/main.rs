@@ -11,7 +11,7 @@ use nfqueue;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[macro_use]
 mod utils;

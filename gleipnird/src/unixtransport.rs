@@ -1,4 +1,5 @@
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
 use std::{
     error::Error,
     io,
@@ -7,7 +8,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::path::Path;
 
 use async_bincode::{AsyncBincodeStream, AsyncDestination};
 use futures::{compat::*, prelude::*, ready};

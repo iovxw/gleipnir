@@ -5,7 +5,7 @@ use pnetlink::{
     packet::netlink::{NetlinkMsgFlags, NetlinkReader, NetlinkRequestBuilder},
     socket::{NetlinkProtocol, NetlinkSocket},
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub struct SockDiag {
     socket: NetlinkSocket,
