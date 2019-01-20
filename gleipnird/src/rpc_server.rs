@@ -98,28 +98,30 @@ pub fn run() -> Result<(), std::io::Error> {
     let permissions = fs::Permissions::from_mode(755);
     fs::set_permissions(&addr, permissions)?;
 
-    let server = Server::default().incoming(transport).for_each(|channel| {
-        let channel = channel.unwrap();
-        let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
-            (*addr.ip()).into()
-        } else {
-            unreachable!()
-        };
+    let server = Server::default()
+        .incoming(transport)
+        .map_ok(|channel| {
+            // This is a hack, see unixtransport module
+            let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
+                (*addr.ip()).into()
+            } else {
+                unreachable!()
+            };
 
-        tokio::executor::spawn(Compat::new(
-            async move {
-                channel
-                    .respond_with(daemon::serve(Daemon {
-                        pid,
-                        authenticated: false,
-                    }))
-                    .await;
-                Ok(())
-            }
-                .boxed(),
-        ));
-        future::ready(())
-    });
+            tokio::executor::spawn(Compat::new(
+                async move {
+                    channel
+                        .respond_with(daemon::serve(Daemon {
+                            pid,
+                            authenticated: false,
+                        }))
+                        .await;
+                    Ok(())
+                }
+                    .boxed(),
+            ));
+        })
+        .for_each(|_| futures::future::ready(()));
 
     rpc::init(tokio::executor::DefaultExecutor::current().compat());
     tokio::run(server.unit_error().boxed().compat());
