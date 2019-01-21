@@ -4,6 +4,8 @@ use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
@@ -24,7 +26,7 @@ pub mod daemon {
     use crate::rules::{Rule, RuleTarget};
     tarpc::service! {
         rpc set_rules(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>);
-        rpc register();
+        rpc register() -> bool;
         rpc unregister();
     }
 }
@@ -58,12 +60,12 @@ struct PackageReport {
 #[derive(Clone)]
 struct Daemon {
     pid: u32,
-    authenticated: bool,
+    authenticated: Arc<AtomicBool>,
 }
 
 impl daemon::Service for Daemon {
     type SetRulesFut = Ready<()>;
-    type RegisterFut = Ready<()>;
+    type RegisterFut = Ready<bool>;
     type UnregisterFut = Ready<()>;
 
     fn set_rules(
@@ -76,9 +78,13 @@ impl daemon::Service for Daemon {
         future::ready(())
     }
     fn register(self, _: context::Context) -> Self::RegisterFut {
-        future::ready(())
+        // FIXME: async
+        let authenticated = crate::polkit::check_authorization(self.pid);
+        self.authenticated.store(authenticated, Ordering::Relaxed);
+        future::ready(authenticated)
     }
     fn unregister(self, _: context::Context) -> Self::UnregisterFut {
+        self.authenticated.store(false, Ordering::Relaxed);
         future::ready(())
     }
 }
@@ -113,7 +119,7 @@ pub fn run() -> Result<(), std::io::Error> {
                     channel
                         .respond_with(daemon::serve(Daemon {
                             pid,
-                            authenticated: false,
+                            authenticated: Arc::new(AtomicBool::new(false)),
                         }))
                         .await;
                     Ok(())
