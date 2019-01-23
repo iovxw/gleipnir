@@ -2,5 +2,6 @@
 
 members = [
     "gleipnir",
-    "gleipnird"
+    "gleipnird",
+    "gleipnir-interface",
 ]

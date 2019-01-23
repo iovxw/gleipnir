@@ -1,19 +1,12 @@
 [package]
-name = "gleipnird"
+name = "gleipnir-interface"
 version = "0.1.0"
 authors = ["iovxw <iovxw@outlook.com>"]
-edition = '2018'
+edition = "2018"
 
 [dependencies]
 libc = "0.2"
-nfqueue = { version = "0.9", path = "./nfqueue-rs" }
-pnet = "0.21"
-pnet_macros_support = "0.21"
-pnetlink = "0.0.3"
-lazy_static = "1.0"
 treebitmap = "0.3"
-lru_time_cache = "0.9"
-dbus = "0.6"
 nix = "0.13"
 tarpc = { version = "0.18",  features = ["serde1"] }
 rpc = { package = "tarpc-lib", version = "0.6" }
@@ -23,7 +16,3 @@ tokio = "0.1"
 async-bincode = "0.4"
 pin-utils = "0.1.0-alpha.4"
 serde = { version = "1.0", features = ["derive"] }
-gleipnir-interface = { version = "0.1", path = "../gleipnir-interface" }
-
-[build-dependencies]
-dbus-codegen = "0.3"

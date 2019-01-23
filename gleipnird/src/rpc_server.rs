@@ -13,49 +13,11 @@ use futures::{
     prelude::*,
     Future,
 };
+use gleipnir_interface::{daemon, unixtransport, Device, Proto, Rule, RuleTarget};
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 use rpc::context;
 use rpc::server::{self, Handler, Server};
 use serde::{Deserialize, Serialize};
-
-use crate::netlink::Proto;
-use crate::rules::{Rule, RuleTarget};
-use crate::Device;
-
-pub mod daemon {
-    use crate::rules::{Rule, RuleTarget};
-    tarpc::service! {
-        rpc set_rules(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>);
-        rpc register() -> bool;
-        rpc unregister();
-    }
-}
-
-mod monitor {
-    use super::*;
-    tarpc::service! {
-        rpc on_packages(logs: Vec<PackageReport>);
-        rpc on_traffic(logs: Vec<ProcTraffic>);
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ProcTraffic {
-    exe: String,
-    receiving: usize,
-    sending: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct PackageReport {
-    device: Device,
-    protocol: Proto,
-    addr: SocketAddr,
-    len: usize,
-    exe: String,
-    dropped: bool,
-    matched_rule: Option<usize>,
-}
 
 #[derive(Clone)]
 struct Daemon {
@@ -99,7 +61,7 @@ pub fn run() -> Result<(), std::io::Error> {
         }
     }
 
-    let transport = crate::unixtransport::listen(&addr)?;
+    let transport = unixtransport::listen(&addr)?;
 
     let permissions = fs::Permissions::from_mode(755);
     fs::set_permissions(&addr, permissions)?;

@@ -1,11 +1,11 @@
 use std::{cmp, fmt, io, mem, net};
 
+use gleipnir_interface::Proto;
 use pnet_macros_support::packet::{Packet, PacketSize};
 use pnetlink::{
     packet::netlink::{NetlinkMsgFlags, NetlinkReader, NetlinkRequestBuilder},
     socket::{NetlinkProtocol, NetlinkSocket},
 };
-use serde::{Deserialize, Serialize};
 
 pub struct SockDiag {
     socket: NetlinkSocket,
@@ -282,14 +282,6 @@ impl fmt::Debug for Ipv4or6 {
             .field("v6", &net::Ipv6Addr::from(*self))
             .finish()
     }
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum Proto {
-    Tcp = libc::IPPROTO_TCP as isize,
-    Udp = libc::IPPROTO_UDP as isize,
-    UdpLite = libc::IPPROTO_UDPLITE as isize,
 }
 
 #[test]

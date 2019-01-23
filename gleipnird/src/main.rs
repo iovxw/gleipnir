@@ -1,17 +1,16 @@
 #![feature(const_fn)]
 #![feature(async_await)]
 #![feature(existential_type)]
-#![feature(proc_macro_hygiene)]
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::thread;
 
+use gleipnir_interface::{Device, Proto};
 use libc;
 use nfqueue;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
 };
-use serde::{Deserialize, Serialize};
 
 #[macro_use]
 mod utils;
@@ -21,7 +20,6 @@ mod polkit;
 mod proc;
 pub mod rpc_server;
 mod rules;
-mod unixtransport;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
@@ -29,21 +27,6 @@ const MAX_IP_PKG_LEN: u32 = 0xFFFF;
 struct State {
     diag: netlink::SockDiag,
     rules: ablock::AbReader<rules::Rules>,
-}
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum Device {
-    Input,
-    Ouput,
-}
-
-impl Device {
-    fn is_input(&self) -> bool {
-        match self {
-            Device::Input => true,
-            Device::Ouput => false,
-        }
-    }
 }
 
 fn queue_callback(msg: nfqueue::Message, state: &mut State) {
@@ -93,7 +76,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
             } else {
                 possible_sockets[0] = Some((src, dst));
             }
-            (netlink::Proto::Tcp, src, dst)
+            (Proto::Tcp, src, dst)
         }
         IpNextHeaderProtocols::Udp | IpNextHeaderProtocols::UdpLite => {
             let pkt = UdpPacket::new(ip_payload).expect("UdpPacket");
@@ -119,9 +102,9 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
                     Some((SocketAddr::new(unspecified_addr, sport), unspecified_socket));
             };
             let p = if protocol == IpNextHeaderProtocols::Udp {
-                netlink::Proto::Udp
+                Proto::Udp
             } else {
-                netlink::Proto::UdpLite
+                Proto::UdpLite
             };
             (p, src, dst)
         }
