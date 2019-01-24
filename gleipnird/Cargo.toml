@@ -20,6 +20,7 @@ rpc = { package = "tarpc-lib", version = "0.6" }
 bincode-transport = { package = "tarpc-bincode-transport", version = "0.7" }
 futures-preview = { version = "0.3.0-alpha.16", features = ["compat"] }
 tokio = "0.1"
+tokio-threadpool = "0.1"
 async-bincode = "0.4"
 pin-utils = "0.1.0-alpha.4"
 serde = { version = "1.0", features = ["derive"] }

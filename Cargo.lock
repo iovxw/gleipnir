@@ -329,6 +329,7 @@ dependencies = [
  "tarpc-bincode-transport 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tarpc-lib 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-threadpool 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "treebitmap 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

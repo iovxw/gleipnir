@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
-    future::{self, Ready},
+    future::{self, poll_fn, Ready},
     prelude::*,
-    Future,
+    FutureExt,
 };
 use gleipnir_interface::{daemon, unixtransport, Device, Proto, Rule, RuleTarget};
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
@@ -27,7 +27,7 @@ struct Daemon {
 
 impl daemon::Service for Daemon {
     type SetRulesFut = Ready<()>;
-    type RegisterFut = Ready<bool>;
+    existential type RegisterFut: Future<Output = bool>;
     type UnregisterFut = Ready<()>;
 
     fn set_rules(
@@ -40,10 +40,23 @@ impl daemon::Service for Daemon {
         future::ready(())
     }
     fn register(self, _: context::Context) -> Self::RegisterFut {
-        // FIXME: async
-        let authenticated = crate::polkit::check_authorization(self.pid);
-        self.authenticated.store(authenticated, Ordering::Relaxed);
-        future::ready(authenticated)
+        use futures::task::Poll;
+        use tokio::prelude::Async;
+        async move {
+            let authenticated = poll_fn(|_| {
+                if let Async::Ready(r) =
+                    tokio_threadpool::blocking(|| crate::polkit::check_authorization(self.pid))
+                        .unwrap()
+                {
+                    Poll::Ready(r)
+                } else {
+                    Poll::Pending
+                }
+            })
+            .await;
+            self.authenticated.store(authenticated, Ordering::Relaxed);
+            authenticated
+        }
     }
     fn unregister(self, _: context::Context) -> Self::UnregisterFut {
         self.authenticated.store(false, Ordering::Relaxed);
