@@ -3,6 +3,14 @@ rust:
   - nightly
 addons:
   apt:
+    sources:
+      - sourceline: 'ppa:beineri/opt-qt-5.12.1-xenial'
     packages:
-    - libnetfilter-queue-dev
-    - libdbus-1-dev
+      - libnetfilter-queue-dev
+      - libdbus-1-dev
+      - mesa-common-dev
+      - qt512declarative
+      - qt512quickcontrols2
+      - qt512graphicaleffects
+      - qt512svg
+      - qt512tools
