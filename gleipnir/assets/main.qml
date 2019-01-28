@@ -15,6 +15,23 @@ ApplicationWindow {
     minimumWidth: 640
     minimumHeight: 480
 
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB'];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    TextMetrics {
+        id: defaultFont
+        text: "O"
+    }
+
     TabBar {
         id: bar
         width: parent.width
@@ -37,13 +54,13 @@ ApplicationWindow {
         Item {
             GroupBox {
                 id: history
-                width: parent.width * 0.7
+                width: parent.width - traffic.width
                 height: parent.height * 0.7
                 title: "History"
             }
             GroupBox {
                 id: logs
-                width: parent.width * 0.7
+                width: parent.width - traffic.width
                 height: parent.height * 0.3
                 title: "Logs"
                 anchors.top: history.bottom
@@ -85,41 +102,98 @@ ApplicationWindow {
                         }
 
                         Label {
-                            text: (model.input ?  "← " : "→ ") + model.protocol + " " + model.addr
+                            text: (model.input ?  "⇤" : "↦") + model.protocol + " " + model.addr
                             anchors.verticalCenter: parent.verticalCenter
                         }
                         spacing: 10
                     }
                 }
             }
-            GroupBox {
+            Frame{
                 id: traffic
-                width: parent.width * 0.3
+                width: Math.max(parent.width * 0.3, 300)
                 height: parent.height
-                title: "Traffic"
                 anchors.left: history.right
-
-                ListView {
-                    clip: true
+                topPadding: 0
+                ColumnLayout {
                     anchors.fill: parent
-                    model: ListModel {
-                        ListElement {
-                            exe: "/usr/bin/curl"
-                            sending: 100
-                            receiving: 50
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        height: separator.implicitHeight
+                        spacing: 0
+
+                        Pane {
+                            id: historyTitle0
+                            topPadding: 0
+                            bottomPadding: 0
+                            Layout.fillWidth: true
+                            Label {
+                                text: "Program"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {
+                            id: separator
+                        }
+                        Pane {
+                            id: historyTitle1
+                            implicitWidth: defaultFont.width * 8
+                            padding: 0
+                            Label {
+                                text: "↑"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {}
+                        Pane {
+                            id: historyTitle2
+                            implicitWidth: defaultFont.width * 8
+                            padding: 0
+                            Label {
+                                text: "↓"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
                         }
                     }
-                    delegate: Row {
-                        Rectangle {
-                            width: 40
-                            height: 40
-                        }
 
-                        Label {
-                            text: exe + " " + sending + " " + receiving
-                            anchors.verticalCenter: parent.verticalCenter
+                    ListView {
+                        clip: true
+                        Layout.fillHeight: true
+                        Layout.fillWidth: true
+                        model: ListModel {
+                            ListElement {
+                                exe: "/usr/bin/curl"
+                                sending: 1000000
+                                receiving: 90000000
+                            }
+                            ListElement {
+                                exe: "/usr/bin/curl"
+                                sending: 123
+                                receiving: 500000
+                            }
                         }
-                        spacing: 10
+                        delegate: Item {
+                            width: parent.width
+                            height: separator.implicitHeight
+
+                            Label {
+                                clip: true
+                                width: historyTitle0.width
+                                text: model.exe
+                            }
+                            Label {
+                                x: historyTitle1.x + historyTitle1.width - width
+                                text: formatBytes(model.sending) + "/s"
+                            }
+                            Label {
+                                anchors.right: parent.right
+                                text: formatBytes(model.receiving) + "/s"
+                            }
+                        }
                     }
                 }
             }
