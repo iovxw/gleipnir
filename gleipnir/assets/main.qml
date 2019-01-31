@@ -10,10 +10,8 @@ ApplicationWindow {
     //: Window title
     title: qsTr("Gleipnir")
 
-    width: 900
-    height: 500
-    minimumWidth: 640
-    minimumHeight: 480
+    minimumWidth: 1000
+    minimumHeight: 500
 
     function formatBytes(bytes, decimals = 2) {
         if (bytes === 0) return '0 Bytes';
@@ -58,63 +56,191 @@ ApplicationWindow {
                 height: parent.height * 0.7
                 title: "History"
             }
-            GroupBox {
+
+            Frame {
                 id: logs
                 width: parent.width - traffic.width
                 height: parent.height * 0.3
-                title: "Logs"
                 anchors.top: history.bottom
+                topPadding: 0
 
-                ListView {
-                    clip: true
+                ColumnLayout {
                     anchors.fill: parent
-                    model: ListModel {
-                        ListElement {
-                            dropped: false
-                            input: true
-                            protocol: "TCP"
-                            addr: "1.1.1.1:443"
-                            len: 42
-                            matched_rule: 1
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        height: separator.implicitHeight
+                        spacing: 0
+
+                        Pane {
+                            id: trafficTitle0
+                            implicitWidth: 40
+                            padding: 0
+                            Label {
+                                text: "R"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
                         }
-                        ListElement {
-                            dropped: true
-                            input: false
-                            protocol: "TCP"
-                            addr: "1.1.1.1:443"
-                            len: 42
-                            matched_rule: 2
+                        ToolSeparator {
+                            id: separator
                         }
-                        ListElement {
-                            dropped: false
-                            input: true
-                            protocol: "TCP"
-                            addr: "1.1.1.1:443"
-                            len: 42
-                            matched_rule: 1
+                        Pane {
+                            id: trafficTitle1
+                            topPadding: 0
+                            bottomPadding: 0
+                            Layout.fillWidth: true
+                            Label {
+                                text: "Program"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {}
+                        Pane {
+                            id: trafficTitle2
+                            implicitWidth: defaultFont.width * 2
+                            padding: 0
+                            Label {
+                                text: "↹"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {}
+                        Pane {
+                            id: trafficTitle3
+                            implicitWidth: defaultFont.width * 15
+                            padding: 0
+                            Label {
+                                text: "Address"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {}
+                        Pane {
+                            id: trafficTitle4
+                            implicitWidth: defaultFont.width * 7
+                            padding: 0
+                            Label {
+                                text: "Protocol"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {}
+                        Pane {
+                            id: trafficTitle5
+                            implicitWidth: defaultFont.width * 10
+                            padding: 0
+                            Label {
+                                text: "Size"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                        ToolSeparator {}
+                        Pane {
+                            id: trafficTitle6
+                            implicitWidth: defaultFont.width * 4
+                            padding: 0
+                            Label {
+                                text: "Rule"
+                                font.bold: true
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
                         }
                     }
-                    delegate: Row {
-                        Rectangle {
-                            width: 40
-                            height: 40
-                            color: if (model.dropped) { "red" } else { "green" }
-                        }
 
-                        Label {
-                            text: (model.input ?  "⇤" : "↦") + model.protocol + " " + model.addr
-                            anchors.verticalCenter: parent.verticalCenter
+                    ListView {
+                        clip: true
+                        Layout.fillHeight: true
+                        Layout.fillWidth: true
+                        model: ListModel {
+                            ListElement {
+                                dropped: false
+                                input: true
+                                exe: "/usr/bin/curl"
+                                protocol: "TCP"
+                                addr: "1.1.1.1:443"
+                                len: 42
+                                matched_rule: 1
+                            }
+                            ListElement {
+                                dropped: true
+                                input: false
+                                exe: "/usr/bin/curl"
+                                protocol: "TCP"
+                                addr: "1.1.1.1:443"
+                                len: 42
+                                matched_rule: 2
+                            }
+                            ListElement {
+                                dropped: false
+                                input: true
+                                exe: "/usr/bin/curl"
+                                protocol: "UDPLite"
+                                addr: "1.1.1.1:443"
+                                len: 42
+                                matched_rule: 1
+                            }
                         }
-                        spacing: 10
+                        delegate: Item {
+                            width: parent.width
+                            height: trafficStatus.height
+
+                            Rectangle {
+                                id: trafficStatus
+                                width: 40
+                                height: 40
+                                color: if (model.dropped) { "red" } else { "green" }
+                            }
+                            Label {
+                                x: trafficTitle1.x
+                                width: trafficTitle1.width
+                                clip: true
+                                text: model.exe
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Label {
+                                x: trafficTitle2.x + (trafficTitle2.width - width) / 2
+                                text: (model.input ?  "⇤" : "↦")
+                                font.pointSize: defaultFont.font.pointSize * 1.5
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Label {
+                                x: trafficTitle3.x
+                                text: model.addr
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Label {
+                                x: trafficTitle4.x + (trafficTitle4.width - width) / 2
+                                text: model.protocol
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Label {
+                                x: trafficTitle5.x + trafficTitle5.width - width
+                                text: formatBytes(model.len)
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Label {
+                                x: trafficTitle6.x
+                                text: model.matched_rule
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
                     }
                 }
             }
-            Frame{
+
+            Frame {
                 id: traffic
                 width: Math.max(parent.width * 0.3, 300)
                 height: parent.height
                 anchors.left: history.right
                 topPadding: 0
+
                 ColumnLayout {
                     anchors.fill: parent
 
@@ -135,7 +261,6 @@ ApplicationWindow {
                             }
                         }
                         ToolSeparator {
-                            id: separator
                         }
                         Pane {
                             id: historyTitle1
