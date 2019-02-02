@@ -1,8 +1,7 @@
 import QtQuick 2.8
 import QtQuick.Layouts 1.3
 import QtQuick.Controls 2.3
-import QtGraphicalEffects 1.0
-import Qt.labs.platform 1.0
+import QtCharts 2.3
 
 ApplicationWindow {
     id: window
@@ -50,11 +49,55 @@ ApplicationWindow {
         anchors.top: bar.bottom
 
         Item {
-            GroupBox {
+            ChartView {
                 id: history
                 width: parent.width - traffic.width
                 height: parent.height * 0.7
                 title: "History"
+                antialiasing: true
+
+                ValueAxis {
+                    id: valueAxisX
+                    tickCount: 12
+                    labelFormat: "x"
+                }
+                ValueAxis {
+                    id: valueAxisY
+                    labelFormat: "%.0f KiB/S"
+                }
+
+                LineSeries {
+                    name: "/bin/two"
+                    axisX: valueAxisX
+                    axisY: valueAxisY
+                    XYPoint { x: 00; y: 4 }
+                    XYPoint { x: 01; y: 1 }
+                    XYPoint { x: 02; y: 1 }
+                    XYPoint { x: 03; y: 2 }
+                    XYPoint { x: 04; y: 1 }
+                    XYPoint { x: 05; y: 0 }
+                    XYPoint { x: 06; y: 3 }
+                    XYPoint { x: 07; y: 1 }
+                    XYPoint { x: 08; y: 4 }
+                    XYPoint { x: 09; y: 4 }
+                    XYPoint { x: 10; y: 4 }
+                }
+                LineSeries {
+                    name: "/bin/one"
+                    axisX: valueAxisX
+                    axisY: valueAxisY
+                    XYPoint { x: 00; y: 1 }
+                    XYPoint { x: 01; y: 1 }
+                    XYPoint { x: 02; y: 1 }
+                    XYPoint { x: 03; y: 1 }
+                    XYPoint { x: 04; y: 1 }
+                    XYPoint { x: 05; y: 0 }
+                    XYPoint { x: 06; y: 1 }
+                    XYPoint { x: 07; y: 1 }
+                    XYPoint { x: 08; y: 4 }
+                    XYPoint { x: 09; y: 3 }
+                    XYPoint { x: 10; y: 2 }
+                }
             }
 
             Frame {
