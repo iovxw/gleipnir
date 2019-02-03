@@ -64,39 +64,66 @@ ApplicationWindow {
                 ValueAxis {
                     id: valueAxisY
                     labelFormat: "%.0f KiB/S"
+                    max: 5
                 }
 
-                LineSeries {
-                    name: "/bin/two"
-                    axisX: valueAxisX
-                    axisY: valueAxisY
-                    XYPoint { x: 00; y: 4 }
-                    XYPoint { x: 01; y: 1 }
-                    XYPoint { x: 02; y: 1 }
-                    XYPoint { x: 03; y: 2 }
-                    XYPoint { x: 04; y: 1 }
-                    XYPoint { x: 05; y: 0 }
-                    XYPoint { x: 06; y: 3 }
-                    XYPoint { x: 07; y: 1 }
-                    XYPoint { x: 08; y: 4 }
-                    XYPoint { x: 09; y: 4 }
-                    XYPoint { x: 10; y: 4 }
-                }
-                LineSeries {
+                // Colors
+                // 209fdf
+                // 99ca53
+                // f6a625
+                // 6d5fd5
+                // bf593e
+
+                AreaSeries {
                     name: "/bin/one"
                     axisX: valueAxisX
                     axisY: valueAxisY
-                    XYPoint { x: 00; y: 1 }
-                    XYPoint { x: 01; y: 1 }
-                    XYPoint { x: 02; y: 1 }
-                    XYPoint { x: 03; y: 1 }
-                    XYPoint { x: 04; y: 1 }
-                    XYPoint { x: 05; y: 0 }
-                    XYPoint { x: 06; y: 1 }
-                    XYPoint { x: 07; y: 1 }
-                    XYPoint { x: 08; y: 4 }
-                    XYPoint { x: 09; y: 3 }
-                    XYPoint { x: 10; y: 2 }
+                    color: "#AA209fdf"
+                    upperSeries: LineSeries {
+                        XYPoint { x: 00; y: 4 }
+                        XYPoint { x: 01; y: 1 }
+                        XYPoint { x: 02; y: 1 }
+                        XYPoint { x: 03; y: 2 }
+                        XYPoint { x: 04; y: 1 }
+                        XYPoint { x: 05; y: 0 }
+                        XYPoint { x: 06; y: 3 }
+                        XYPoint { x: 07; y: 1 }
+                        XYPoint { x: 08; y: 4 }
+                        XYPoint { x: 09; y: 4 }
+                        XYPoint { x: 10; y: 4 }
+                    }
+                }
+                AreaSeries {
+                    name: "/bin/two"
+                    axisX: valueAxisX
+                    axisY: valueAxisY
+                    color: "#AA99ca53"
+                    upperSeries: LineSeries {
+                        XYPoint { x: 00; y: 1 }
+                        XYPoint { x: 01; y: 0 }
+                        XYPoint { x: 02; y: 0 }
+                        XYPoint { x: 03; y: 1 }
+                        XYPoint { x: 04; y: 1 }
+                        XYPoint { x: 05; y: 0 }
+                        XYPoint { x: 06; y: 1 }
+                        XYPoint { x: 07; y: 1 }
+                        XYPoint { x: 08; y: 5 }
+                        XYPoint { x: 09; y: 3 }
+                        XYPoint { x: 10; y: 2 }
+                    }
+                }
+                AreaSeries {
+                    name: "/bin/three"
+                    axisX: valueAxisX
+                    axisY: valueAxisY
+                    color: "#AAf6a625"
+                    upperSeries: LineSeries {
+                        XYPoint { x: 06; y: 0 }
+                        XYPoint { x: 07; y: 3 }
+                        XYPoint { x: 08; y: 1 }
+                        XYPoint { x: 09; y: 0 }
+                        XYPoint { x: 10; y: 2 }
+                    }
                 }
             }
 
