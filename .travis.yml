@@ -15,3 +15,5 @@ addons:
       - qt512graphicaleffects
       - qt512svg
       - qt512tools
+install:
+  - source /opt/qt512/bin/qt512-env.sh
