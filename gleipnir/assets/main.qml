@@ -39,6 +39,9 @@ ApplicationWindow {
         TabButton {
             text: qsTr("Firewall")
         }
+        TabButton {
+            text: qsTr("Rate Limit")
+        }
     }
 
     StackLayout {
@@ -48,5 +51,7 @@ ApplicationWindow {
         anchors.top: bar.bottom
 
         MonitorPage {}
+
+        FirewallPage {}
     }
 }
