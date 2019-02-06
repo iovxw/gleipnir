@@ -34,6 +34,7 @@ cpp! {{
 qrc! { init_ressource,
      "/" {
          "assets/main.qml",
+         "assets/MonitorPage.qml"
      },
 }
 
