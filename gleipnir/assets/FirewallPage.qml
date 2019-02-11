@@ -97,41 +97,7 @@ Pane {
             clip: true
             Layout.fillHeight: true
             Layout.fillWidth: true
-            model: ListModel {
-                ListElement {
-                    isInput: true
-                    proto: 0
-                    exe: "/usr/bin/curl"
-                    portBegin: 0
-                    portEnd: 0
-                    isV4: true
-                    addr: "192.168.1.1"
-                    mask: 32
-                    target: 0
-                }
-                ListElement {
-                    isInput: true
-                    proto: 0
-                    exe: "/usr/bin/curl"
-                    portBegin: 0
-                    portEnd: 0
-                    isV4: true
-                    addr: "192.168.1.1"
-                    mask: 32
-                    target: 0
-                }
-                ListElement {
-                    isInput: true
-                    proto: 0
-                    exe: "/usr/bin/curl"
-                    portBegin: 0
-                    portEnd: 0
-                    isV4: true
-                    addr: "192.168.1.1"
-                    mask: 32
-                    target: 0
-                }
-            }
+            model: backend.rules
             delegate: Pane {
                 implicitWidth: parent.width
                 implicitHeight: direction.height + topPadding * 2
@@ -238,8 +204,15 @@ Pane {
                 ComboBox {
                     x: firewallTitle6.x
                     currentIndex: target
-                    model: [qsTr("Accept"), qsTr("UDP"), "Rate Limit Rule 1", "Rate Limit Rule 2"]
-                    Component.onCompleted: firewallTitle6.implicitWidth = width
+                    Component.onCompleted: {
+                        firewallTitle6.implicitWidth = width
+                        updateModel()
+                        backend.target_changed.connect(updateModel)
+                    }
+                    function updateModel() {
+                        let baseTargets = [qsTr("Accept"), qsTr("Drop")];
+                        model = baseTargets.concat(backend.targets)
+                    }
                 }
             }
         }

@@ -44,6 +44,11 @@ fn main() {
 
     let mut engine = QmlEngine::new();
 
+    let backend = implementation::Backend::new();
+    let backend = QObjectBox::new(backend);
+    let backend = backend.pinned();
+    engine.set_object_property("backend".into(), backend);
+
     let engine = &mut engine;
     unsafe {
         cpp!([engine as "QmlEngineHolder*"] {
