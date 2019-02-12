@@ -108,30 +108,39 @@ Pane {
                 ComboBox {
                     id: direction
                     x: firewallTitle0.x
-                    currentIndex: model.isInput ? 1 : 0
+                    currentIndex: 0
+                    onCurrentIndexChanged: isInput = currentIndex == 0
                     width: firewallTitle0.width
                     model: [qsTr("Input"), qsTr("Output")]
+                    Component.onCompleted: currentIndex = isInput ? 0 : 1
                 }
                 ComboBox {
                     x: firewallTitle1.x
-                    currentIndex: proto
+                    currentIndex: 0
+                    onCurrentIndexChanged: proto = currentIndex
                     width: defaultFont.width * 7 + indicator.width
                     model: ["TCP", "UDP", "UDPLite"]
-                    Component.onCompleted: firewallTitle1.implicitWidth = width
+                    Component.onCompleted: {
+                        firewallTitle1.implicitWidth = width
+                        currentIndex = proto
+                    }
                 }
-                Label {
+                TextField {
                     x: firewallTitle2.x
-                    clip: true
                     width: firewallTitle2.width
-                    text: model.exe
+                    text: ""
+                    onTextChanged: model.exe = text
                     anchors.verticalCenter: parent.verticalCenter
+                    Component.onCompleted: text = model.exe
                 }
                 TextField {
                     x: firewallTitle3.x
                     width: firewallTitle3.width
                     selectByMouse: true
-                    text: model.addr
+                    text: ""
+                    onTextChanged: model.addr = text
                     anchors.verticalCenter: parent.verticalCenter
+                    Component.onCompleted: text = model.addr
                 }
                 TextField {
                     x: firewallTitle4.x + (firewallTitle4.width - width) / 2
@@ -139,7 +148,9 @@ Pane {
                     selectByMouse: true
                     validator: IntValidator{bottom: 0; top: 128 /*model.isV4 ? 32 : 128;*/}
                     horizontalAlignment: TextInput.AlignHCenter
-                    text: model.mask
+                    text: ""
+                    onTextChanged: model.mask = parseInt(text)
+                    Component.onCompleted: text = model.mask
                 }
                 Control {
                     id: portRange
@@ -175,11 +186,13 @@ Pane {
                         validator: IntValidator{bottom: 1; top: 65535;}
                         selectByMouse: true
                         horizontalAlignment: TextInput.AlignHCenter
-                        text: model.portBegin
+                        text: ""
+                        onTextChanged: model.portBegin = parseInt(text)
                         onTextEdited: {
                             portChecker.stop()
                             portChecker.start()
                         }
+                        Component.onCompleted: text = model.portBegin
                     }
                     Label {
                         id: portHyphen
@@ -194,22 +207,31 @@ Pane {
                         validator: IntValidator{bottom: 1; top: 65535;}
                         selectByMouse: true
                         horizontalAlignment: TextInput.AlignHCenter
-                        text: model.portEnd
+                        text: ""
+                        onTextChanged: model.portEnd = parseInt(text)
                         onTextEdited: {
                             portChecker.stop()
                             portChecker.start()
                         }
+                        Component.onCompleted: text = model.portEnd
                     }
                 }
                 ComboBox {
                     x: firewallTitle6.x
-                    currentIndex: target
+                    currentIndex: 0
+                    onCurrentIndexChanged: target = currentIndex
+                    model: []
                     Component.onCompleted: {
                         firewallTitle6.implicitWidth = width
                         updateModel()
-                        backend.target_changed.connect(updateModel)
+                        backend.targets_changed.connect(updateModel)
+                        currentIndex = target
                     }
                     function updateModel() {
+                        if (model.length && !backend.targets.includes(model[currentIndex])) {
+                            // Old target is removed, reset selected target
+                            currentIndex = 0
+                        }
                         let baseTargets = [qsTr("Accept"), qsTr("Drop")];
                         model = baseTargets.concat(backend.targets)
                     }
