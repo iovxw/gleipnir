@@ -88,6 +88,7 @@ pub fn run() -> Result<(), std::io::Error> {
             } else {
                 unreachable!()
             };
+            dbg!(pid);
 
             tokio::executor::spawn(Compat::new(
                 async move {

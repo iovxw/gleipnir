@@ -33,7 +33,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
     let device = if msg.get_indev() != 0 {
         Device::Input
     } else if msg.get_outdev() != 0 {
-        Device::Ouput
+        Device::Output
     } else {
         unreachable!("package is from neither INPUT nor OUTPUT");
     };

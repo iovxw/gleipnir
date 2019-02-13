@@ -63,12 +63,12 @@ pub struct Rules {
     any_port: Vec<usize>,
     raw: Vec<Rule>,
     default_target: RuleTarget,
-    qos_state: RefCell<Vec<Bucket>>,
+    rate_state: RefCell<Vec<Bucket>>,
     cache: RefCell<LruCache<u64, (Option<usize>, RuleTarget)>>,
 }
 
 impl Rules {
-    pub fn new(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>) -> Self {
+    pub fn new(default_target: RuleTarget, rules: Vec<Rule>, rate_rules: Vec<usize>) -> Self {
         macro_rules! insert_rule {
             ($target: tt, $rule: tt, $name: tt, $any: tt,  $index: tt) => {
                 if let Some(k) = $rule.$name {
@@ -94,16 +94,16 @@ impl Rules {
             any_port: Default::default(),
             raw: rules.clone(),
             default_target: default_target,
-            qos_state: Default::default(),
+            rate_state: Default::default(),
             cache: RefCell::new(LruCache::with_capacity(2048)),
         };
 
-        for limit in qos_rules {
-            r.qos_state.borrow_mut().push(Bucket::new(limit));
+        for limit in rate_rules {
+            r.rate_state.borrow_mut().push(Bucket::new(limit));
         }
 
-        let mut v4_hashmap: HashMap<(Ipv4Addr, u32), Vec<usize>> = HashMap::new();
-        let mut v6_hashmap: HashMap<(Ipv6Addr, u32), Vec<usize>> = HashMap::new();
+        let mut v4_hashmap: HashMap<(Ipv4Addr, u8), Vec<usize>> = HashMap::new();
+        let mut v6_hashmap: HashMap<(Ipv6Addr, u8), Vec<usize>> = HashMap::new();
 
         for (index, rule) in rules.into_iter().enumerate() {
             insert_rule!(r, rule, device, any_device, index);
@@ -133,10 +133,10 @@ impl Rules {
         }
 
         for ((ip, masklen), index) in v4_hashmap {
-            r.v4_table.insert(ip, masklen, index);
+            r.v4_table.insert(ip, masklen.into(), index);
         }
         for ((ip, masklen), index) in v6_hashmap {
-            r.v6_table.insert(ip, masklen, index);
+            r.v6_table.insert(ip, masklen.into(), index);
         }
 
         r
@@ -164,7 +164,7 @@ impl Rules {
         let accept = match target {
             RuleTarget::Accept => true,
             RuleTarget::Drop => false,
-            RuleTarget::Qos(qos_id) => self.qos_state.borrow_mut()[qos_id].stuff(len),
+            RuleTarget::RateLimit(rate_id) => self.rate_state.borrow_mut()[rate_id].stuff(len),
         };
         (rule_id, accept)
     }

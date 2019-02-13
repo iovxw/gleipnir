@@ -14,7 +14,7 @@ pub mod unixtransport;
 pub mod daemon {
     use super::{Rule, RuleTarget};
     tarpc::service! {
-        rpc set_rules(default_target: RuleTarget, rules: Vec<Rule>, qos_rules: Vec<usize>);
+        rpc set_rules(default_target: RuleTarget, rules: Vec<Rule>, rate_rules: Vec<usize>);
         rpc register() -> bool;
         rpc unregister();
     }
@@ -49,14 +49,14 @@ pub struct PackageReport {
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum Device {
     Input,
-    Ouput,
+    Output,
 }
 
 impl Device {
     pub fn is_input(&self) -> bool {
         match self {
             Device::Input => true,
-            Device::Ouput => false,
+            Device::Output => false,
         }
     }
 }
@@ -73,7 +73,7 @@ pub enum Proto {
 pub enum RuleTarget {
     Accept,
     Drop,
-    Qos(usize), // index to QosRules
+    RateLimit(usize), // index to rate_rules item
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -83,7 +83,7 @@ pub struct Rule {
     pub exe: Option<String>,
     #[serde(with = "rangeinclusive_serde")]
     pub port: Option<RangeInclusive<u16>>,
-    pub subnet: (IpAddr, u32), // mask
+    pub subnet: (IpAddr, u8), // mask
     pub target: RuleTarget,
 }
 
@@ -161,7 +161,7 @@ pub trait Address: Copy {
     /// Convert from string of nibbles.
     fn from_nibbles(nibbles: &[u8]) -> Self;
     /// Returns self masked to n bits.
-    fn mask(self, masklen: u32) -> Self;
+    fn mask(self, masklen: u8) -> Self;
 }
 
 impl Address for Ipv4Addr {
@@ -193,7 +193,7 @@ impl Address for Ipv4Addr {
         unsafe { mem::transmute(ret) }
     }
 
-    fn mask(self, masklen: u32) -> Self {
+    fn mask(self, masklen: u8) -> Self {
         debug_assert!(masklen <= 32);
         let ip = u32::from(self);
         let masked = match masklen {
@@ -233,7 +233,7 @@ impl Address for Ipv6Addr {
         unsafe { mem::transmute(ret) }
     }
 
-    fn mask(self, masklen: u32) -> Self {
+    fn mask(self, masklen: u8) -> Self {
         debug_assert!(masklen <= 128);
         let (first, last): (u64, u64) = unsafe { mem::transmute(self) };
         if masklen <= 64 {
