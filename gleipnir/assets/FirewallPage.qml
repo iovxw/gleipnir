@@ -109,17 +109,17 @@ Pane {
                     id: direction
                     x: firewallTitle0.x
                     currentIndex: 0
-                    onCurrentIndexChanged: isInput = currentIndex == 0
+                    onCurrentIndexChanged: device = currentIndex
                     width: firewallTitle0.width
-                    model: [qsTr("Input"), qsTr("Output")]
-                    Component.onCompleted: currentIndex = isInput ? 0 : 1
+                    model: [qsTr("Any"), qsTr("Input"), qsTr("Output")]
+                    Component.onCompleted: currentIndex = device
                 }
                 ComboBox {
                     x: firewallTitle1.x
                     currentIndex: 0
                     onCurrentIndexChanged: proto = currentIndex
                     width: defaultFont.width * 7 + indicator.width
-                    model: ["TCP", "UDP", "UDPLite"]
+                    model: [qsTr("Any"), "TCP", "UDP", "UDPLite"]
                     Component.onCompleted: {
                         firewallTitle1.implicitWidth = width
                         currentIndex = proto
@@ -245,6 +245,7 @@ Pane {
             Button {
                 anchors.right: parent.right
                 text: qsTr("Apply")
+                onClicked: backend.apply_rules()
             }
         }
     }
