@@ -121,8 +121,10 @@ pub struct Backend {
     pub default_target: qt_property!(usize),
     pub apply_rules: qt_method!(fn(&mut self)),
     pub rate_rules: qt_property!(RefCell<MutListModel<RateLimitRule>>; CONST),
+    pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
+    pub daemon_connected_changed: qt_signal!(),
     runtime: Runtime,
-    client: daemon::Client,
+    client: Option<daemon::Client>,
 }
 
 impl Backend {
@@ -153,7 +155,7 @@ impl Backend {
                 }
                     .boxed(),
             ))
-            .unwrap();
+            .ok();
 
         // TODO
         let rate_rules = MutListModel::from_iter(vec![]);
@@ -166,6 +168,8 @@ impl Backend {
             default_target,
             apply_rules: Default::default(),
             rate_rules: RefCell::new(rate_rules),
+            daemon_connected: client.is_some(),
+            daemon_connected_changed: Default::default(),
             runtime,
             client,
         }
@@ -175,7 +179,11 @@ impl Backend {
         let authed = self
             .runtime
             .block_on(Compat::new(
-                self.client.register(tarpc::context::current()).boxed(),
+                self.client
+                    .as_mut()
+                    .expect("")
+                    .register(tarpc::context::current())
+                    .boxed(),
             ))
             .unwrap();
         dbg!(authed);
@@ -192,6 +200,8 @@ impl Backend {
         self.runtime
             .block_on(Compat::new(
                 self.client
+                    .as_mut()
+                    .expect("")
                     .set_rules(tarpc::context::current(), default_target, rules, rate_rules)
                     .boxed(),
             ))
