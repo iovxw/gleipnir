@@ -137,6 +137,24 @@ impl Backend {
             port_end: 0,
             addr: "8.8.8.8".to_string().into(),
             ..Default::default()
+        },
+        QRule {
+            device: 1,
+            proto: 1,
+            exe: "".to_string().into(),
+            port_begin: 0,
+            port_end: 0,
+            addr: "8.8.8.8".to_string().into(),
+            ..Default::default()
+        },
+        QRule {
+            device: 1,
+            proto: 1,
+            exe: "".to_string().into(),
+            port_begin: 0,
+            port_end: 0,
+            addr: "8.8.8.8".to_string().into(),
+            ..Default::default()
         }]);
         let targets = QVariantList::from_iter(vec![
             QString::from("Rate Limit Rule 1".to_string()),
