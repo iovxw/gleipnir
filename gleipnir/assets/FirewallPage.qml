@@ -95,6 +95,7 @@ Pane {
         }
 
         DelegateModel {
+            property bool dragActive: false
             id: visualModel
             model: backend.rules
             delegate: Item {
@@ -108,6 +109,7 @@ Pane {
 
                     drag.target: pressed ? content : undefined
                     drag.axis: Drag.YAxis
+                    drag.onActiveChanged: visualModel.dragActive = drag.active
                 }
 
                 DropArea {
@@ -284,6 +286,23 @@ Pane {
             Layout.fillHeight: true
             Layout.fillWidth: true
             model: visualModel
+            footer: Pane {
+                width: parent.width
+                padding: 0
+                topPadding: separator.padding
+                bottomPadding: topPadding
+
+                Button {
+                    id: addBtn
+                    width: parent.width
+                    text: "+"
+                    scale: !visualModel.dragActive ? 1.0 : 0.0
+                    Behavior on scale {
+                        NumberAnimation  { duration: 250 ; easing.type: Easing.InOutCubic  }
+                    }
+                    onClicked: backend.new_rule()
+                }
+            }
         }
 
         Pane {

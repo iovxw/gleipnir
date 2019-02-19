@@ -123,6 +123,7 @@ pub struct Backend {
     pub rate_rules: qt_property!(RefCell<MutListModel<RateLimitRule>>; CONST),
     pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
     pub daemon_connected_changed: qt_signal!(),
+    pub new_rule: qt_method!(fn(&mut self)),
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -188,6 +189,7 @@ impl Backend {
             rate_rules: RefCell::new(rate_rules),
             daemon_connected: client.is_some(),
             daemon_connected_changed: Default::default(),
+            new_rule: Default::default(),
             runtime,
             client,
         }
@@ -224,6 +226,10 @@ impl Backend {
                     .boxed(),
             ))
             .unwrap();
+    }
+
+    pub fn new_rule(&mut self) {
+        self.rules.borrow_mut().push(QRule::default());
     }
 }
 
