@@ -113,7 +113,7 @@ Pane {
                 }
 
                 DropArea {
-                    anchors { fill: parent }
+                    anchors.fill: parent
 
                     onEntered: visualModel.items.move(
                         drag.source.parent.DelegateModel.itemsIndex,
@@ -186,7 +186,7 @@ Pane {
                         x: firewallTitle4.x + (firewallTitle4.width - width) / 2
                         width: defaultFont.width * 4
                         selectByMouse: true
-                        validator: IntValidator{bottom: 0; top: 128 /*model.isV4 ? 32 : 128;*/}
+                        validator: IntValidator { bottom: 0; top: 128 /*model.isV4 ? 32 : 128;*/ }
                         horizontalAlignment: TextInput.AlignHCenter
                         text: ""
                         onTextChanged: model.mask = parseInt(text)
@@ -298,7 +298,7 @@ Pane {
                     text: "+"
                     scale: !visualModel.dragActive ? 1.0 : 0.0
                     Behavior on scale {
-                        NumberAnimation  { duration: 250 ; easing.type: Easing.InOutCubic  }
+                        NumberAnimation  { duration: 250; easing.type: Easing.InOutCubic }
                     }
                     onClicked: backend.new_rule()
                 }
