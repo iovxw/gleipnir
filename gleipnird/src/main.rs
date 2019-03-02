@@ -5,7 +5,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::thread;
 
-use gleipnir_interface::{Device, Proto};
+use gleipnir_interface::{Address, Device, Proto, Rule, RuleTarget};
 use libc;
 use nfqueue;
 use pnet::packet::{
@@ -20,6 +20,8 @@ mod polkit;
 mod proc;
 pub mod rpc_server;
 mod rules;
+
+use rules::Rules;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
@@ -188,7 +190,18 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
 }
 
 fn main() {
-    let (rules, rules_setter) = ablock::AbLock::new(unsafe { std::mem::zeroed() });
+    let (rules, rules_setter) = ablock::AbLock::new(Rules::new(
+        RuleTarget::Accept,
+        vec![Rule {
+            exe: Some("/usr/bin/curl".into()),
+            port: Some(80..=80),
+            target: RuleTarget::Drop,
+            device: None,
+            proto: None,
+            subnet: ("192.168.1.1".parse().unwrap(), 32),
+        }],
+        vec![],
+    ));
     let state = State {
         diag: netlink::SockDiag::new().expect(""),
         rules,

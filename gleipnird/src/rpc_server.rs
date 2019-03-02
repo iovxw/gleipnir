@@ -37,6 +37,7 @@ impl daemon::Service for Daemon {
         rules: Vec<Rule>,
         qos_rules: Vec<usize>,
     ) -> Self::SetRulesFut {
+        dbg!(default_target, rules, qos_rules);
         future::ready(())
     }
     fn register(self, _: context::Context) -> Self::RegisterFut {

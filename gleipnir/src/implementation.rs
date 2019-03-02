@@ -51,8 +51,7 @@ impl From<&QRule> for Rule {
             (port, 0) => Some(RangeInclusive::new(port, port)),
             (port_begin, port_end) => Some(RangeInclusive::new(port_begin, port_end)),
         };
-        // TODO
-        let addr = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+        let addr = String::from_utf16_lossy(qrule.addr.to_slice()).parse().expect("Failed to parse IpAddr");
         let subnet = (addr, qrule.mask);
         let target = match qrule.target {
             0 => RuleTarget::Accept,
