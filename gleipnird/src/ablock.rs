@@ -1,12 +1,11 @@
 use std::marker::PhantomData;
-use std::mem;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 pub struct AbLock<T> {
     a: T,
-    b: T,
+    b: Option<T>,
     state: AbState,
 }
 
@@ -14,7 +13,7 @@ impl<T> AbLock<T> {
     pub fn new(v: T) -> (AbReader<T>, AbSetter<T>) {
         let inner = AbLock {
             a: v,
-            b: unsafe { mem::zeroed() },
+            b: None,
             state: AbState::new(true),
         };
         let inner = Arc::new(inner);
@@ -38,7 +37,11 @@ impl<T> AbReader<T> {
         let side = unsafe { self.0.state.set_read() };
 
         ReadGuard {
-            value: if side { &self.0.a } else { &self.0.b },
+            value: if side {
+                &self.0.a
+            } else {
+                self.0.b.as_ref().expect("unreachable AbLock state")
+            },
             state: &self.0.state,
         }
     }
@@ -48,9 +51,12 @@ impl<T> AbSetter<T> {
     pub fn set(&self, value: T) {
         unsafe {
             self.0.state.swap_side(|current_side_a| {
-                let next_side =
-                    if current_side_a { &self.0.b } else { &self.0.a } as *const T as *mut T;
-                *next_side = value;
+                let ptr = (&*self.0) as *const AbLock<T> as *mut AbLock<T>;
+                if current_side_a {
+                    (*ptr).b = Some(value);
+                } else {
+                    (*ptr).a = value;
+                };
             });
         }
     }
@@ -125,5 +131,7 @@ mod test {
         assert_eq!(*r.read(), 0);
         s.set(1);
         assert_eq!(*r.read(), 1);
+        s.set(2);
+        assert_eq!(*r.read(), 2);
     }
 }
