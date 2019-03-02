@@ -88,15 +88,15 @@ impl AbState {
     }
     unsafe fn set_read(&self) -> bool {
         match self.state.fetch_add(1, Ordering::AcqRel) {
-            0b001 => true,
-            0b101 => false,
-            0b010 | 0b110 => panic!("AbLock can only have one reader"),
+            0b000 => true,
+            0b100 => false,
+            0b001 | 0b101 => panic!("AbLock can only have one reader"),
             _ => unreachable!(),
         }
     }
     unsafe fn unset_read(&self) {
         match self.state.fetch_sub(1, Ordering::AcqRel) {
-            0b000 | 0b100 => (),
+            0b001 | 0b101 => (),
             _ => unreachable!(),
         }
     }
@@ -113,5 +113,17 @@ impl AbState {
             .compare_and_swap(current_side, next_side, Ordering::AcqRel)
             != current_side
         {}
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn ablock() {
+        let (r, s) = AbLock::new(0);
+        assert_eq!(*r.read(), 0);
+        s.set(1);
+        assert_eq!(*r.read(), 1);
     }
 }
