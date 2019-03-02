@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
 use std::net::SocketAddr;
@@ -19,6 +20,13 @@ use rpc::context;
 use rpc::server::{self, Handler, Server};
 use serde::{Deserialize, Serialize};
 
+use crate::ablock::AbSetter;
+use crate::rules::Rules;
+
+thread_local! {
+    static RULES_SETTER: RefCell<Option<AbSetter<Rules>>> = RefCell::new(None);
+}
+
 #[derive(Clone)]
 struct Daemon {
     pid: u32,
@@ -35,9 +43,19 @@ impl daemon::Service for Daemon {
         _: context::Context,
         default_target: RuleTarget,
         rules: Vec<Rule>,
-        qos_rules: Vec<usize>,
+        rate_rules: Vec<usize>,
     ) -> Self::SetRulesFut {
-        dbg!(default_target, rules, qos_rules);
+        dbg!(default_target, &rules, &rate_rules);
+        if self.authenticated.load(Ordering::Relaxed) {
+            let rules = Rules::new(default_target, rules, rate_rules);
+            RULES_SETTER.with(|rules_setter| {
+                rules_setter
+                    .borrow()
+                    .as_ref()
+                    .expect("Daemon is not thread safe!")
+                    .set(rules);
+            });
+        }
         future::ready(())
     }
     fn register(self, _: context::Context) -> Self::RegisterFut {
@@ -47,7 +65,7 @@ impl daemon::Service for Daemon {
             let authenticated = poll_fn(|_| {
                 if let Async::Ready(r) =
                     tokio_threadpool::blocking(|| crate::polkit::check_authorization(self.pid))
-                        .unwrap()
+                    .unwrap()
                 {
                     Poll::Ready(r)
                 } else {
@@ -65,7 +83,7 @@ impl daemon::Service for Daemon {
     }
 }
 
-pub fn run() -> Result<(), std::io::Error> {
+pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
     let addr = std::path::PathBuf::from("/tmp/gleipnir");
     if addr.exists() {
         if UnixStream::connect(&addr).is_ok() {
@@ -74,6 +92,8 @@ pub fn run() -> Result<(), std::io::Error> {
             fs::remove_file(&addr)?;
         }
     }
+
+    RULES_SETTER.with(|rules| *rules.borrow_mut() = Some(rules_setter));
 
     let transport = unixtransport::listen(&addr)?;
 

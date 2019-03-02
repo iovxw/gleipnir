@@ -51,7 +51,9 @@ impl From<&QRule> for Rule {
             (port, 0) => Some(RangeInclusive::new(port, port)),
             (port_begin, port_end) => Some(RangeInclusive::new(port_begin, port_end)),
         };
-        let addr = String::from_utf16_lossy(qrule.addr.to_slice()).parse().expect("Failed to parse IpAddr");
+        let addr = String::from_utf16_lossy(qrule.addr.to_slice())
+            .parse()
+            .expect("Failed to parse IpAddr");
         let subnet = (addr, qrule.mask);
         let target = match qrule.target {
             0 => RuleTarget::Accept,
@@ -129,33 +131,35 @@ pub struct Backend {
 
 impl Backend {
     pub fn new() -> Self {
-        let rules = MutListModel::from_iter(vec![QRule {
-            device: 1,
-            proto: 1,
-            exe: "".to_string().into(),
-            port_begin: 0,
-            port_end: 0,
-            addr: "8.8.8.8".to_string().into(),
-            ..Default::default()
-        },
-        QRule {
-            device: 1,
-            proto: 1,
-            exe: "".to_string().into(),
-            port_begin: 0,
-            port_end: 0,
-            addr: "8.8.8.8".to_string().into(),
-            ..Default::default()
-        },
-        QRule {
-            device: 1,
-            proto: 1,
-            exe: "".to_string().into(),
-            port_begin: 0,
-            port_end: 0,
-            addr: "8.8.8.8".to_string().into(),
-            ..Default::default()
-        }]);
+        let rules = MutListModel::from_iter(vec![
+            QRule {
+                device: 1,
+                proto: 1,
+                exe: "".to_string().into(),
+                port_begin: 0,
+                port_end: 0,
+                addr: "8.8.8.8".to_string().into(),
+                ..Default::default()
+            },
+            QRule {
+                device: 1,
+                proto: 1,
+                exe: "".to_string().into(),
+                port_begin: 0,
+                port_end: 0,
+                addr: "8.8.8.8".to_string().into(),
+                ..Default::default()
+            },
+            QRule {
+                device: 1,
+                proto: 1,
+                exe: "".to_string().into(),
+                port_begin: 0,
+                port_end: 0,
+                addr: "8.8.8.8".to_string().into(),
+                ..Default::default()
+            },
+        ]);
         let targets = QVariantList::from_iter(vec![
             QString::from("Rate Limit Rule 1".to_string()),
             QString::from("Rate Limit Rule 2".to_string()),

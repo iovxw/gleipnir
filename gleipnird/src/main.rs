@@ -209,9 +209,7 @@ fn main() {
     let mut q = nfqueue::Queue::new(state);
 
     thread::spawn(|| {
-        // TODO: start a dbus server
-        rpc_server::run();
-        std::mem::drop(rules_setter);
+        rpc_server::run(rules_setter);
     });
 
     q.open();
