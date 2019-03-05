@@ -44,7 +44,14 @@ impl LocalRulesSetter {
     }
 
     fn borrow<'a>(&'a self) -> &'a AbSetter<Rules> {
-        unsafe { &*RULES_SETTER.with(|x| x.borrow().as_ref().expect("") as *const AbSetter<_>) }
+        unsafe {
+            &*RULES_SETTER.with(|x| {
+                x.borrow()
+                    .as_ref()
+                    .expect("LocalRulesSetter is not thread safe!")
+                    as *const AbSetter<_>
+            })
+        }
     }
 }
 
