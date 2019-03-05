@@ -7,6 +7,7 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread::LocalKey;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
@@ -26,11 +27,32 @@ use crate::rules::Rules;
 thread_local! {
     static RULES_SETTER: RefCell<Option<AbSetter<Rules>>> = RefCell::new(None);
 }
+#[derive(Clone, Copy)]
+struct LocalRulesSetter {
+    _private: (),
+}
+
+impl LocalRulesSetter {
+    fn init(v: AbSetter<Rules>) -> Self {
+        RULES_SETTER.with(|rules| {
+            if rules.borrow().is_some() {
+                panic!("LocalRulesSetter already initialized")
+            }
+            *rules.borrow_mut() = Some(v);
+        });
+        Self { _private: () }
+    }
+
+    fn borrow<'a>(&'a self) -> &'a AbSetter<Rules> {
+        unsafe { &*RULES_SETTER.with(|x| x.borrow().as_ref().expect("") as *const AbSetter<_>) }
+    }
+}
 
 #[derive(Clone)]
 struct Daemon {
     pid: u32,
     authenticated: Arc<AtomicBool>,
+    rules_setter: LocalRulesSetter,
 }
 
 impl daemon::Service for Daemon {
@@ -48,13 +70,7 @@ impl daemon::Service for Daemon {
         dbg!(default_target, &rules, &rate_rules);
         if self.authenticated.load(Ordering::Relaxed) {
             let rules = Rules::new(default_target, rules, rate_rules);
-            RULES_SETTER.with(|rules_setter| {
-                rules_setter
-                    .borrow()
-                    .as_ref()
-                    .expect("Daemon is not thread safe!")
-                    .set(rules);
-            });
+            self.rules_setter.borrow().set(rules);
         }
         future::ready(())
     }
@@ -65,7 +81,7 @@ impl daemon::Service for Daemon {
             let authenticated = poll_fn(|_| {
                 if let Async::Ready(r) =
                     tokio_threadpool::blocking(|| crate::polkit::check_authorization(self.pid))
-                    .unwrap()
+                        .unwrap()
                 {
                     Poll::Ready(r)
                 } else {
@@ -93,7 +109,7 @@ pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
         }
     }
 
-    RULES_SETTER.with(|rules| *rules.borrow_mut() = Some(rules_setter));
+    let rules_setter = LocalRulesSetter::init(rules_setter);
 
     let transport = unixtransport::listen(&addr)?;
 
@@ -102,7 +118,7 @@ pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
 
     let server = Server::default()
         .incoming(transport)
-        .map_ok(|channel| {
+        .map_ok(move |channel| {
             // This is a hack, see unixtransport module
             let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
                 (*addr.ip()).into()
@@ -117,6 +133,7 @@ pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
                         .respond_with(daemon::serve(Daemon {
                             pid,
                             authenticated: Arc::new(AtomicBool::new(false)),
+                            rules_setter,
                         }))
                         .await;
                     Ok(())
