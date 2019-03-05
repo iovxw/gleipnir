@@ -44,6 +44,7 @@ impl LocalRulesSetter {
     }
 
     fn borrow<'a>(&'a self) -> &'a AbSetter<Rules> {
+        // This is safe since self is never 'static
         unsafe {
             &*RULES_SETTER.with(|x| {
                 x.borrow()
