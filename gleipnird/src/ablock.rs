@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::thread::panicking;
 
 pub struct AbLock<T> {
     a: T,
@@ -76,8 +77,8 @@ impl<'a, T> Deref for ReadGuard<'a, T> {
 
 impl<'a, T> Drop for ReadGuard<'a, T> {
     fn drop(&mut self) {
-        unsafe {
-            self.state.unset_read();
+        if !panicking() {
+            unsafe { self.state.unset_read() }
         }
     }
 }
@@ -133,5 +134,12 @@ mod test {
         assert_eq!(*r.read(), 1);
         s.set(2);
         assert_eq!(*r.read(), 2);
+    }
+    #[test]
+    #[should_panic(expected = "AbLock can only have one reader")]
+    fn two_reader() {
+        let (r, _s) = AbLock::new(0);
+        let _a = r.read();
+        r.read();
     }
 }
