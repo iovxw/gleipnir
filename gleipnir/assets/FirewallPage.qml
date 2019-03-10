@@ -263,20 +263,10 @@ Pane {
                         x: firewallTitle6.x
                         currentIndex: 0
                         onCurrentIndexChanged: target = currentIndex
-                        model: []
+                        model: defaultTarget.model
                         Component.onCompleted: {
                             firewallTitle6.implicitWidth = width
-                            updateModel()
-                            backend.targets_changed.connect(updateModel)
                             currentIndex = target
-                        }
-                        function updateModel() {
-                            if (model.length && !backend.targets.includes(model[currentIndex])) {
-                                // Old target is removed, reset selected target
-                                currentIndex = 0
-                            }
-                            let baseTargets = [qsTr("Accept"), qsTr("Drop")];
-                            model = baseTargets.concat(backend.targets)
                         }
                     }
                     Rectangle {
@@ -341,7 +331,30 @@ Pane {
         Pane {
             Layout.fillWidth: true
             padding: 0
+            implicitHeight: applyBtn.height
+            RowLayout {
+                anchors.verticalCenter: parent.verticalCenter
+                Label {
+                    text: qsTr("Default Target: ")
+                }
+                ComboBox {
+                    id: defaultTarget
+                    currentIndex: 0
+                    onCurrentIndexChanged: backend.default_target = currentIndex
+                    model: []
+                    Component.onCompleted: {
+                        updateModel()
+                        backend.targets_changed.connect(updateModel)
+                        currentIndex = backend.default_target
+                    }
+                    function updateModel() {
+                        let baseTargets = [qsTr("Accept"), qsTr("Drop")];
+                        model = baseTargets.concat(backend.targets)
+                    }
+                }
+            }
             Button {
+                id: applyBtn
                 anchors.right: parent.right
                 text: qsTr("Apply")
                 onClicked: backend.apply_rules()
