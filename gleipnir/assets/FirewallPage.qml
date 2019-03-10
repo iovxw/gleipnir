@@ -4,6 +4,7 @@ import QtQuick.Controls 2.3
 import QtQml.Models 2.1
 
 Pane {
+    id: root
     ColumnLayout {
         anchors.fill: parent
 
@@ -281,13 +282,13 @@ Pane {
                     Rectangle {
                         id: removeBtn
                         property bool confirm: false
-                        height: content.implicitHeight - content.topPadding - content.bottomPadding
-                        width: removeBtnLabel.width + 20
+                        height: parent.height
+                        width: removeBtnLabel.width + root.padding * 2
                         x: ruleRow.containsMouse && !visualModel.dragActive ?
-                            (removeBtnArea.containsMouse ? ruleRow.width - width : ruleRow.width - 10) :
-                            ruleRow.width
+                            (removeBtnArea.containsMouse ? root.width - root.padding - width : root.availableWidth) :
+                            root.width
                         Behavior on x {
-                            NumberAnimation  { duration: 200; easing.type: Easing.InOutCubic }
+                            NumberAnimation  { duration: 200; easing.type: Easing.InOutCirc }
                         }
                         color: confirm ? "green" : "red"
                         Label {
@@ -315,7 +316,6 @@ Pane {
 
         ListView {
             id: rulesTable
-            clip: true
             Layout.fillHeight: true
             Layout.fillWidth: true
             model: visualModel
