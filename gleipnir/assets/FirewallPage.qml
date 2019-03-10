@@ -98,7 +98,9 @@ Pane {
             property bool dragActive: false
             id: visualModel
             model: backend.rules
-            delegate: Item {
+            delegate: MouseArea {
+                id: ruleRow
+                hoverEnabled: true
                 height: content.height
                 width: parent.width
 
@@ -107,7 +109,7 @@ Pane {
 
                     anchors.fill: parent
 
-                    drag.target: pressed ? content : undefined
+                    drag.target: content
                     drag.axis: Drag.YAxis
                     drag.onActiveChanged: visualModel.dragActive = drag.active
                 }
@@ -137,7 +139,7 @@ Pane {
                     Drag.hotSpot.x: width / 2
                     Drag.hotSpot.y: height / 2
                     states: State {
-                        when: dragArea.pressed
+                        when: dragArea.drag.active
 
                         ParentChange { target: content; parent: rulesTable }
                         AnchorChanges {
@@ -274,6 +276,37 @@ Pane {
                             }
                             let baseTargets = [qsTr("Accept"), qsTr("Drop")];
                             model = baseTargets.concat(backend.targets)
+                        }
+                    }
+                    Rectangle {
+                        id: removeBtn
+                        property bool confirm: false
+                        height: content.implicitHeight - content.topPadding - content.bottomPadding
+                        width: removeBtnLabel.width + 20
+                        x: ruleRow.containsMouse && !visualModel.dragActive ?
+                            (removeBtnArea.containsMouse ? ruleRow.width - width : ruleRow.width - 10) :
+                            ruleRow.width
+                        Behavior on x {
+                            NumberAnimation  { duration: 200; easing.type: Easing.InOutCubic }
+                        }
+                        color: confirm ? "green" : "red"
+                        Label {
+                            id: removeBtnLabel
+                            anchors.centerIn: parent
+                            text: parent.confirm ? qsTr("Confirm") : qsTr("Remove")
+                            color: "white"
+                            font.bold: true
+                        }
+                        MouseArea {
+                            id: removeBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: if (parent.confirm) {
+                                visualModel.items.remove(ruleRow.DelegateModel.itemsIndex)
+                            } else {
+                                parent.confirm = true
+                            }
+                            onExited: parent.confirm = false
                         }
                     }
                 }
