@@ -39,9 +39,6 @@ ApplicationWindow {
         TabButton {
             text: qsTr("Firewall")
         }
-        TabButton {
-            text: qsTr("Rate Limit")
-        }
     }
 
     StackLayout {
@@ -53,5 +50,54 @@ ApplicationWindow {
         MonitorPage {}
 
         FirewallPage {}
+    }
+
+    Popup {
+        id: startDaemonPopup
+        anchors.centerIn: Overlay.overlay
+        ColumnLayout {
+            anchors.fill: parent
+            Label {
+                text: qsTr("Daemon not found, start it manually?")
+            }
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Yes")
+                onClicked: {
+                    backend.start_daemon_error.connect((err) => {
+                        errorPopup.message = qsTr("Failed to start daemon:")
+                        errorPopup.error = err
+                        errorPopup.open()
+                    })
+                    backend.start_daemon()
+                    startDaemonPopup.close()
+                }
+            }
+        }
+    }
+    Popup {
+        id: errorPopup
+        property string message: ""
+        property string error: ""
+        anchors.centerIn: Overlay.overlay
+        ColumnLayout {
+            anchors.fill: parent
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: qsTr("Error!")
+                font.bold: true
+            }
+            MenuSeparator {
+                Layout.fillWidth: true
+            }
+            Label {
+                text: errorPopup.message
+            }
+            Label {
+                text: errorPopup.error
+                font.italic: true
+                font.weight: Font.Light
+            }
+        }
     }
 }

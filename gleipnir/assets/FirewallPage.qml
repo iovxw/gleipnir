@@ -357,7 +357,11 @@ Pane {
                 id: applyBtn
                 anchors.right: parent.right
                 text: qsTr("Apply")
-                onClicked: backend.apply_rules()
+                onClicked: if (backend.daemon_connected) {
+                    backend.apply_rules()
+                } else {
+                    startDaemonPopup.open()
+                }
             }
         }
     }

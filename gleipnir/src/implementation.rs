@@ -1,7 +1,9 @@
 use std::cell::RefCell;
+use std::env;
+use std::io;
 use std::iter::FromIterator;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::RangeInclusive;
+use std::process::Command;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
@@ -125,6 +127,8 @@ pub struct Backend {
     pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
     pub daemon_connected_changed: qt_signal!(),
     pub new_rule: qt_method!(fn(&mut self)),
+    pub start_daemon: qt_method!(fn(&mut self)),
+    pub start_daemon_error: qt_signal!(e: QString),
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -193,6 +197,8 @@ impl Backend {
             daemon_connected: client.is_some(),
             daemon_connected_changed: Default::default(),
             new_rule: Default::default(),
+            start_daemon: Default::default(),
+            start_daemon_error: Default::default(),
             runtime,
             client,
         }
@@ -233,6 +239,33 @@ impl Backend {
 
     pub fn new_rule(&mut self) {
         self.rules.borrow_mut().push(QRule::default());
+    }
+    pub fn start_daemon(&mut self) {
+        // To Packager: set a START_GLEIPNIRD_CMD env at compile time to override the default
+        // command, when you are not using systemd
+        let cmd = env::var("START_GLEIPNIRD_CMD")
+            .ok()
+            .or_else(|| option_env!("START_GLEIPNIRD_CMD").map(String::from))
+            .unwrap_or_else(|| "systemctl start gleipnird".to_string());
+        let r: io::Result<()> = try {
+            let output = Command::new("/bin/sh").args(&["-c", &cmd]).output()?;
+            if !output.status.success() {
+                self.start_daemon_error((&*String::from_utf8_lossy(&output.stderr)).into())
+            }
+            let client = self.runtime.block_on(Compat::new(
+                async {
+                    let transport = unixtransport::connect("/tmp/gleipnir").await?;
+                    daemon::new_stub(tarpc::client::Config::default(), transport).await
+                }
+                    .boxed(),
+            ))?;
+            self.client = Some(client);
+            self.daemon_connected = true;
+            self.daemon_connected_changed();
+        };
+        if let Err(e) = r {
+            self.start_daemon_error(e.to_string().into());
+        }
     }
 }
 
