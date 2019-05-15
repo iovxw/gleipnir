@@ -52,6 +52,10 @@ ApplicationWindow {
         FirewallPage {}
     }
 
+    Component.onCompleted: if (!backend.daemon_connected) {
+        startDaemonPopup.open()
+    }
+
     Popup {
         id: startDaemonPopup
         anchors.centerIn: Overlay.overlay
