@@ -58,7 +58,28 @@ ApplicationWindow {
 
     Popup {
         id: startDaemonPopup
-        anchors.centerIn: Overlay.overlay
+        property real realY: Math.round((parent.height - height) / 2)
+        parent: Overlay.overlay
+        x: Math.round((parent.width - width) / 2)
+        y: realY
+        enter: Transition {
+            NumberAnimation {
+                property: "y"
+                easing.type: Easing.OutBack
+                from: 0
+                to: startDaemonPopup.realY
+                duration: 200
+            }
+        }
+        exit: Transition {
+            NumberAnimation {
+                property: "y"
+                easing.type: Easing.InBack
+                from: startDaemonPopup.realY
+                to: 0
+                duration: errorPopup.visible ? 0 : 200
+            }
+        }
         ColumnLayout {
             anchors.fill: parent
             Label {
@@ -84,6 +105,24 @@ ApplicationWindow {
         property string message: ""
         property string error: ""
         anchors.centerIn: Overlay.overlay
+        enter: Transition {
+            NumberAnimation {
+                property: "scale"
+                easing.type: Easing.OutBack
+                from: 0.0
+                to: 1.0
+                duration: 200
+            }
+        }
+        exit: Transition {
+            NumberAnimation {
+                property: "scale"
+                easing.type: Easing.InBack
+                from: 1.0
+                to: 0.0
+                duration: 200
+            }
+        }
         ColumnLayout {
             anchors.fill: parent
             Label {
