@@ -32,6 +32,7 @@ cpp! {{
     };
 }}
 
+#[cfg(not(debug_assertions))]
 qrc! { init_ressource,
      "/" {
          "assets/main.qml",
@@ -41,6 +42,7 @@ qrc! { init_ressource,
 }
 
 fn main() {
+    #[cfg(not(debug_assertions))]
     init_ressource();
 
     let mut engine = QmlEngine::new();
@@ -62,6 +64,11 @@ fn main() {
             //engine->app->setWindowIcon(icon);
         });
     }
-    engine.load_file("qrc:/assets/main.qml".into());
+    engine.load_file(
+        #[cfg(debug_assertions)]
+        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/main.qml").into(),
+        #[cfg(not(debug_assertions))]
+        "qrc:/assets/main.qml".into(),
+    );
     engine.exec();
 }

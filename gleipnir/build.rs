@@ -42,6 +42,7 @@ fn main() {
     };
     let macos_lib_framework = if cfg!(target_os = "macos") { "" } else { "5" };
 
+    println!("cargo:rerun-if-changed=build.rs");
     println!(
         "cargo:rustc-link-search{}={}",
         macos_lib_search,
