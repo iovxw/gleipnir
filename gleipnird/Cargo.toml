@@ -5,6 +5,7 @@ authors = ["iovxw <iovxw@outlook.com>"]
 edition = '2018'
 
 [dependencies]
+jemallocator = "0.3"
 libc = "0.2"
 nfqueue = { version = "0.9", path = "./nfqueue-rs" }
 pnet = "0.21"

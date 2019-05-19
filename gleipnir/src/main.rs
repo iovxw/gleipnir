@@ -6,6 +6,9 @@
 #![feature(async_await)]
 #![recursion_limit = "128"]
 
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::os::unix::fs::PermissionsExt;

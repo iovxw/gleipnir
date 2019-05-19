@@ -28,6 +28,7 @@ fn qmake_query(var: &str) -> String {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
     let qt_include_path = qmake_query("QT_INSTALL_HEADERS");
     let qt_library_path = qmake_query("QT_INSTALL_LIBS");
 
@@ -64,5 +65,4 @@ fn main() {
         "cargo:rustc-link-lib{}=Qt{}Widgets",
         macos_lib_search, macos_lib_framework
     );
-    println!("cargo:rerun-if-changed=build.rs");
 }
