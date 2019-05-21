@@ -1,11 +1,12 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
+use std::io;
 use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::LocalKey;
 
@@ -15,7 +16,7 @@ use futures::{
     prelude::*,
     FutureExt,
 };
-use gleipnir_interface::{daemon, unixtransport, Device, Proto, Rule, RuleTarget};
+use gleipnir_interface::{daemon, monitor, unixtransport, Device, Proto, Rule, RuleTarget};
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 use rpc::context;
 use rpc::server::{self, Handler, Server};
@@ -61,6 +62,7 @@ struct Daemon {
     pid: u32,
     authenticated: Arc<AtomicBool>,
     rules_setter: LocalRulesSetter,
+    client: Arc<monitor::Client>,
 }
 
 impl daemon::Service for Daemon {
@@ -108,7 +110,7 @@ impl daemon::Service for Daemon {
 }
 
 pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
-    let addr = std::path::PathBuf::from("/tmp/gleipnir");
+    let addr = std::path::PathBuf::from("/tmp/gleipnird");
     if addr.exists() {
         if UnixStream::connect(&addr).is_ok() {
             return Err(std::io::ErrorKind::AddrInUse.into());
@@ -124,9 +126,25 @@ pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
     let permissions = fs::Permissions::from_mode(755);
     fs::set_permissions(&addr, permissions)?;
 
+    let clients = Arc::new(AtomicUsize::new(0));
+
+    struct ClientRc(Arc<AtomicUsize>);
+    impl Drop for ClientRc {
+        fn drop(&mut self) {
+            dbg!("disconnected");
+            self.0.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+
     let server = Server::default()
         .incoming(transport)
         .map_ok(move |channel| {
+            if clients.fetch_add(1, Ordering::AcqRel) >= 1 {
+                // TODO: log
+                clients.fetch_sub(1, Ordering::AcqRel);
+                return;
+            }
+
             // This is a hack, see unixtransport module
             let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
                 (*addr.ip()).into()
@@ -135,17 +153,24 @@ pub fn run(rules_setter: AbSetter<Rules>) -> Result<(), std::io::Error> {
             };
             dbg!(pid);
 
+            let clients = clients.clone();
             tokio::executor::spawn(Compat::new(
                 async move {
+                    let counter = ClientRc(clients);
+                    let transport = unixtransport::connect("/tmp/gleipnir").await?;
+                    let client =
+                        monitor::new_stub(tarpc::client::Config::default(), transport).await?;
                     channel
                         .respond_with(daemon::serve(Daemon {
                             pid,
                             authenticated: Arc::new(AtomicBool::new(false)),
                             rules_setter,
+                            client: Arc::new(client),
                         }))
                         .await;
                     Ok(())
                 }
+                    .map_err(|e: io::Error| eprintln!("Connecting to client: {}", e))
                     .boxed(),
             ));
         })

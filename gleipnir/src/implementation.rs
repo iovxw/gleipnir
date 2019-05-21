@@ -176,7 +176,7 @@ impl Backend {
         let client = runtime
             .block_on(Compat::new(
                 async {
-                    let transport = unixtransport::connect("/tmp/gleipnir").await?;
+                    let transport = unixtransport::connect("/tmp/gleipnird").await?;
                     daemon::new_stub(tarpc::client::Config::default(), transport).await
                 }
                     .boxed(),
@@ -254,7 +254,7 @@ impl Backend {
             }
             let client = self.runtime.block_on(Compat::new(
                 async {
-                    let transport = unixtransport::connect("/tmp/gleipnir").await?;
+                    let transport = unixtransport::connect("/tmp/gleipnird").await?;
                     daemon::new_stub(tarpc::client::Config::default(), transport).await
                 }
                     .boxed(),

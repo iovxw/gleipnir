@@ -12,12 +12,14 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::os::unix::fs::PermissionsExt;
+use std::thread;
 
 use cpp::*;
 use qmetaobject::*;
 
 mod implementation;
 mod listmodel;
+mod monitor;
 
 cpp! {{
     #include <memory>
@@ -48,6 +50,10 @@ fn main() {
     #[cfg(not(debug_assertions))]
     init_ressource();
 
+    thread::spawn(|| {
+        monitor::run();
+    });
+
     let mut engine = QmlEngine::new();
 
     let backend = implementation::Backend::new();
@@ -73,5 +79,6 @@ fn main() {
         #[cfg(not(debug_assertions))]
         "qrc:/assets/main.qml".into(),
     );
+
     engine.exec();
 }
