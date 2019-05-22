@@ -42,9 +42,6 @@ pub fn run() -> Result<(), std::io::Error> {
 
     let transport = unixtransport::listen(&addr)?;
 
-    let permissions = fs::Permissions::from_mode(755);
-    fs::set_permissions(&addr, permissions)?;
-
     let server = Server::default()
         .incoming(transport)
         .map_ok(move |channel| {
