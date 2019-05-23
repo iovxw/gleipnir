@@ -20,11 +20,14 @@ tarpc = { version = "0.18",  features = ["serde1"] }
 rpc = { package = "tarpc-lib", version = "0.6" }
 bincode-transport = { package = "tarpc-bincode-transport", version = "0.7" }
 futures-preview = { version = "0.3.0-alpha.16", features = ["compat"] }
+futures-locks = "0.3"
 tokio = "0.1"
 tokio-threadpool = "0.1"
 async-bincode = "0.4"
 pin-utils = "0.1.0-alpha.4"
 serde = { version = "1.0", features = ["derive"] }
+crossbeam-channel = "0.3"
+slab = "0.4"
 gleipnir-interface = { version = "0.1", path = "../gleipnir-interface" }
 
 [build-dependencies]

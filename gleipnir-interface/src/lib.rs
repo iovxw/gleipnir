@@ -24,18 +24,10 @@ pub mod monitor {
     use super::*;
     tarpc::service! {
         rpc on_packages(logs: Vec<PackageReport>);
-        rpc on_traffic(logs: Vec<ProcTraffic>);
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProcTraffic {
-    pub exe: String,
-    pub receiving: usize,
-    pub sending: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PackageReport {
     pub device: Device,
     pub protocol: Proto,

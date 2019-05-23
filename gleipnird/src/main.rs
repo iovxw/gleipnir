@@ -6,9 +6,11 @@
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::sync::Arc;
 use std::thread;
 
-use gleipnir_interface::{Address, Device, Proto, Rule, RuleTarget};
+use crossbeam_channel;
+use gleipnir_interface::{Address, Device, PackageReport, Proto, Rule, RuleTarget};
 use libc;
 use nfqueue;
 use pnet::packet::{
@@ -32,6 +34,7 @@ const MAX_IP_PKG_LEN: u32 = 0xFFFF;
 struct State {
     diag: netlink::SockDiag,
     rules: ablock::AbReader<rules::Rules>,
+    pkt_logs: crossbeam_channel::Sender<PackageReport>,
 }
 
 fn queue_callback(msg: nfqueue::Message, state: &mut State) {
@@ -165,31 +168,28 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
         }
     };
 
-    println!(
-        "DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}, LEN: {}, EXE: {}",
-        device,
-        protocol,
-        src,
-        dst,
-        payload.len(),
-        proc.exe,
-    );
-
+    let rule_addr = if device.is_input() { src } else { dst };
     let rules = state.rules.read();
-    let (rule_id, accept) = rules.is_acceptable(
+    let (rule_id, accept) =
+        rules.is_acceptable(device, protocol, rule_addr, payload.len(), &proc.exe);
+
+    let log = PackageReport {
         device,
         protocol,
-        if device.is_input() { src } else { dst },
-        payload.len(),
-        &proc.exe,
-    );
-    dbg!(rule_id, accept);
-    // TODO: write result to logs
+        addr: rule_addr,
+        len: payload.len(),
+        exe: proc.exe,
+        dropped: !accept,
+        matched_rule: rule_id,
+    };
+
     if accept {
         msg.set_verdict(nfqueue::Verdict::Accept);
     } else {
         msg.set_verdict(nfqueue::Verdict::Drop);
     }
+
+    state.pkt_logs.try_send(log).expect("logs service dead");
 }
 
 fn main() {
@@ -205,14 +205,16 @@ fn main() {
         }],
         vec![],
     ));
+    let (sender, receiver) = crossbeam_channel::unbounded();
     let state = State {
         diag: netlink::SockDiag::new().expect(""),
         rules,
+        pkt_logs: sender,
     };
     let mut q = nfqueue::Queue::new(state);
 
     thread::spawn(|| {
-        rpc_server::run(rules_setter);
+        rpc_server::run(rules_setter, receiver);
     });
 
     q.open();

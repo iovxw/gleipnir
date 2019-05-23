@@ -10,7 +10,7 @@ use futures::{
     FutureExt,
 };
 use gleipnir_interface::{
-    daemon, monitor, unixtransport, Device, PackageReport, ProcTraffic, Proto, Rule, RuleTarget,
+    daemon, monitor, unixtransport, Device, PackageReport, Proto, Rule, RuleTarget,
 };
 use rpc::context;
 use rpc::server::{self, Handler, Server};
@@ -21,11 +21,8 @@ struct Monitor {}
 
 impl monitor::Service for Monitor {
     type OnPackagesFut = Ready<()>;
-    type OnTrafficFut = Ready<()>;
     fn on_packages(self, _: context::Context, logs: Vec<PackageReport>) -> Self::OnPackagesFut {
-        future::ready(())
-    }
-    fn on_traffic(self, _: context::Context, logs: Vec<ProcTraffic>) -> Self::OnTrafficFut {
+        dbg!(logs);
         future::ready(())
     }
 }
@@ -45,10 +42,14 @@ pub fn run() -> Result<(), std::io::Error> {
     let server = Server::default()
         .incoming(transport)
         .map_ok(move |channel| {
-            async move {
-                channel.respond_with(monitor::serve(Monitor {})).await;
-            }
-                .boxed()
+            tokio::executor::spawn(Compat::new(
+                async move {
+                    dbg!("ahhj");
+                    channel.respond_with(monitor::serve(Monitor {})).await;
+                    Ok(())
+                }
+                    .boxed(),
+            ))
         })
         .for_each(|_| futures::future::ready(()));
 
