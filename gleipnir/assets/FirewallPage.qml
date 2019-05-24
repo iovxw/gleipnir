@@ -359,6 +359,8 @@ Pane {
                 text: qsTr("Apply")
                 onClicked: if (backend.daemon_connected) {
                     backend.apply_rules()
+                } else if (backend.daemon_exists()) {
+                    backend.connect_to_daemon()
                 } else {
                     startDaemonPopup.open()
                 }

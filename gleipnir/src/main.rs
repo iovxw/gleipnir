@@ -47,15 +47,17 @@ fn main() {
     #[cfg(not(debug_assertions))]
     init_ressource();
 
-    thread::spawn(|| {
-        monitor::run();
-    });
-
     let mut engine = QmlEngine::new();
 
     let backend = implementation::Backend::new();
     let backend = QObjectBox::new(backend);
     let backend = backend.pinned();
+
+    thread::spawn(|| {
+        monitor::run();
+    });
+    backend.borrow_mut().connect_to_daemon();
+
     engine.set_object_property("backend".into(), backend);
 
     let engine = &mut engine;

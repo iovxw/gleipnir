@@ -4,6 +4,7 @@ use std::io;
 use std::iter::FromIterator;
 use std::ops::RangeInclusive;
 use std::process::Command;
+use std::os::unix::net::UnixStream;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
@@ -129,6 +130,8 @@ pub struct Backend {
     pub new_rule: qt_method!(fn(&mut self)),
     pub start_daemon: qt_method!(fn(&mut self)),
     pub start_daemon_error: qt_signal!(e: QString),
+    pub connect_to_daemon: qt_method!(fn(&mut self)),
+    pub daemon_exists: qt_method!(fn(&self) -> bool),
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -173,15 +176,6 @@ impl Backend {
         let mut runtime = Runtime::new().unwrap();
 
         tarpc::init(tokio::executor::DefaultExecutor::current().compat());
-        let client = runtime
-            .block_on(Compat::new(
-                async {
-                    let transport = unixtransport::connect("/tmp/gleipnird").await?;
-                    daemon::new_stub(tarpc::client::Config::default(), transport).await
-                }
-                    .boxed(),
-            ))
-            .ok();
 
         // TODO
         let rate_rules = MutListModel::from_iter(vec![]);
@@ -194,13 +188,15 @@ impl Backend {
             default_target,
             apply_rules: Default::default(),
             rate_rules: RefCell::new(rate_rules),
-            daemon_connected: client.is_some(),
+            daemon_connected: false,
             daemon_connected_changed: Default::default(),
             new_rule: Default::default(),
             start_daemon: Default::default(),
             start_daemon_error: Default::default(),
+            connect_to_daemon: Default::default(),
+            daemon_exists: Default::default(),
             runtime,
-            client,
+            client: None,
         }
     }
 
@@ -266,6 +262,23 @@ impl Backend {
         if let Err(e) = r {
             self.start_daemon_error(e.to_string().into());
         }
+    }
+    pub fn connect_to_daemon(&mut self) {
+        if let Ok(client) = self.runtime.block_on(Compat::new(
+            async {
+                let transport = unixtransport::connect("/tmp/gleipnird").await?;
+                daemon::new_stub(tarpc::client::Config::default(), transport).await
+            }
+                .boxed(),
+        )) {
+            self.client = Some(client);
+            self.daemon_connected = true;
+            self.daemon_connected_changed();
+        }
+    }
+    pub fn daemon_exists(&self) -> bool {
+        let addr = std::path::PathBuf::from("/tmp/gleipnird");
+        addr.exists() && UnixStream::connect(&addr).is_ok()
     }
 }
 
