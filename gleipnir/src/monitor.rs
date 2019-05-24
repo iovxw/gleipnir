@@ -1,20 +1,15 @@
 use std::fs;
-use std::io;
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::UnixStream;
 
 use futures::{
-    compat::{Compat, Executor01CompatExt},
-    future::{self, poll_fn, Ready},
+    compat::Executor01CompatExt,
+    future::{self, Ready},
     prelude::*,
     FutureExt,
 };
-use gleipnir_interface::{
-    daemon, monitor, unixtransport, Device, PackageReport, Proto, Rule, RuleTarget,
-};
+use gleipnir_interface::{monitor, unixtransport, PackageReport};
 use rpc::context;
-use rpc::server::{self, Handler, Server};
-use serde::{Deserialize, Serialize};
+use rpc::server::Server;
 
 #[derive(Clone)]
 struct Monitor {}
@@ -42,14 +37,10 @@ pub fn run() -> Result<(), std::io::Error> {
     let server = Server::default()
         .incoming(transport)
         .map_ok(move |channel| {
-            tokio::executor::spawn(Compat::new(
-                async move {
-                    dbg!("ahhj");
-                    channel.respond_with(monitor::serve(Monitor {})).await;
-                    Ok(())
-                }
-                    .boxed(),
-            ))
+            async move {
+                channel.respond_with(monitor::serve(Monitor {})).await;
+            }
+                .boxed()
         })
         .for_each(|_| futures::future::ready(()));
 

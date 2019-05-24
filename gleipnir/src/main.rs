@@ -9,9 +9,6 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use std::fs::{self, File};
-use std::io::prelude::*;
-use std::os::unix::fs::PermissionsExt;
 use std::thread;
 
 use cpp::*;
