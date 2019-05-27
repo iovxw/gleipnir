@@ -53,8 +53,16 @@ fn main() {
     let backend = QObjectBox::new(backend);
     let backend = backend.pinned();
 
+    let ptr = QPointer::from(backend.borrow());
+    let on_packages_callback = queued_callback(move |logs| {
+        ptr.as_ref().map(|p| {
+            let mutp = unsafe { &mut *(p as *const _ as *mut implementation::Backend) };
+            mutp.on_packages(logs);
+        });
+    });
+
     thread::spawn(|| {
-        monitor::run();
+        monitor::run(on_packages_callback);
     });
     backend.borrow_mut().connect_to_daemon();
 

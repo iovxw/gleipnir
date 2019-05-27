@@ -3,14 +3,14 @@ use std::env;
 use std::io;
 use std::iter::FromIterator;
 use std::ops::RangeInclusive;
-use std::process::Command;
 use std::os::unix::net::UnixStream;
+use std::process::Command;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
     future::FutureExt,
 };
-use gleipnir_interface::{daemon, unixtransport, Device, Proto, Rule, RuleTarget};
+use gleipnir_interface::{daemon, unixtransport, Device, PackageReport, Proto, Rule, RuleTarget};
 use qmetaobject::*;
 use tarpc;
 use tokio::runtime::current_thread::Runtime;
@@ -279,6 +279,9 @@ impl Backend {
     pub fn daemon_exists(&self) -> bool {
         let addr = std::path::PathBuf::from("/tmp/gleipnird");
         addr.exists() && UnixStream::connect(&addr).is_ok()
+    }
+    pub fn on_packages(&mut self, logs: Vec<PackageReport>) {
+        dbg!(logs);
     }
 }
 
