@@ -1,5 +1,6 @@
 use std::fs;
 use std::os::unix::net::UnixStream;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::implementation::Backend;
 use futures::{
@@ -12,6 +13,8 @@ use gleipnir_interface::{monitor, unixtransport, PackageReport};
 use qmetaobject::QPointer;
 use rpc::context;
 use rpc::server::Server;
+
+pub static MONITOR_RUNNING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
 struct Monitor<F>
@@ -46,17 +49,22 @@ where
     }
 
     let transport = unixtransport::listen(&addr)?;
+    MONITOR_RUNNING.store(true, Ordering::Release);
 
     let server = Server::default()
         .incoming(transport)
-        .map_ok(move |channel| {
+        .and_then(move |channel| {
             let on_packages = on_packages.clone();
             async move {
                 channel
                     .respond_with(monitor::serve(Monitor { on_packages }))
                     .await;
+                Ok(())
             }
                 .boxed()
+        })
+        .map_err(|e| {
+            dbg!(e);
         })
         .for_each(|_| futures::future::ready(()));
 

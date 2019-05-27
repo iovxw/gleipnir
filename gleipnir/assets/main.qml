@@ -53,7 +53,11 @@ ApplicationWindow {
     }
 
     Component.onCompleted: if (!backend.daemon_connected) {
-        startDaemonPopup.open()
+        if (backend.daemon_exists()) {
+            backend.connect_to_daemon()
+        } else {
+            startDaemonPopup.open()
+        }
     }
 
     Popup {

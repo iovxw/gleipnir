@@ -5,6 +5,8 @@ use std::iter::FromIterator;
 use std::ops::RangeInclusive;
 use std::os::unix::net::UnixStream;
 use std::process::Command;
+use std::sync::atomic::Ordering;
+use std::thread;
 
 use futures::{
     compat::{Compat, Executor01CompatExt},
@@ -15,7 +17,9 @@ use qmetaobject::*;
 use tarpc;
 use tokio::runtime::current_thread::Runtime;
 
+use crate::implementation;
 use crate::listmodel::{MutListItem, MutListModel};
+use crate::monitor;
 
 #[derive(QGadget, SimpleListItem, Default)]
 pub struct QRule {
@@ -131,6 +135,7 @@ pub struct Backend {
     pub start_daemon: qt_method!(fn(&mut self)),
     pub start_daemon_error: qt_signal!(e: QString),
     pub connect_to_daemon: qt_method!(fn(&mut self)),
+    pub connect_to_daemon_error: qt_signal!(e: QString),
     pub daemon_exists: qt_method!(fn(&self) -> bool),
     runtime: Runtime,
     client: Option<daemon::Client>,
@@ -194,6 +199,7 @@ impl Backend {
             start_daemon: Default::default(),
             start_daemon_error: Default::default(),
             connect_to_daemon: Default::default(),
+            connect_to_daemon_error: Default::default(),
             daemon_exists: Default::default(),
             runtime,
             client: None,
@@ -248,33 +254,43 @@ impl Backend {
             if !output.status.success() {
                 self.start_daemon_error((&*String::from_utf8_lossy(&output.stderr)).into())
             }
-            let client = self.runtime.block_on(Compat::new(
-                async {
-                    let transport = unixtransport::connect("/tmp/gleipnird").await?;
-                    daemon::new_stub(tarpc::client::Config::default(), transport).await
-                }
-                    .boxed(),
-            ))?;
-            self.client = Some(client);
-            self.daemon_connected = true;
-            self.daemon_connected_changed();
+            self.connect_to_daemon_impl()?;
         };
         if let Err(e) = r {
             self.start_daemon_error(e.to_string().into());
         }
     }
     pub fn connect_to_daemon(&mut self) {
-        if let Ok(client) = self.runtime.block_on(Compat::new(
+        if let Err(e) = self.connect_to_daemon_impl() {
+            self.connect_to_daemon_error(e.to_string().into());
+        }
+    }
+    fn connect_to_daemon_impl(&mut self) -> Result<(), io::Error> {
+        if !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {
+            let ptr = QPointer::from(&*self);
+            let on_packages_callback = queued_callback(move |logs| {
+                ptr.as_ref().map(|p| {
+                    let mutp = unsafe { &mut *(p as *const _ as *mut implementation::Backend) };
+                    mutp.on_packages(logs);
+                });
+            });
+
+            thread::spawn(|| {
+                monitor::run(on_packages_callback);
+            });
+            while !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {}
+        }
+        let client = self.runtime.block_on(Compat::new(
             async {
                 let transport = unixtransport::connect("/tmp/gleipnird").await?;
                 daemon::new_stub(tarpc::client::Config::default(), transport).await
             }
                 .boxed(),
-        )) {
-            self.client = Some(client);
-            self.daemon_connected = true;
-            self.daemon_connected_changed();
-        }
+        ))?;
+        self.client = Some(client);
+        self.daemon_connected = true;
+        self.daemon_connected_changed();
+        Ok(())
     }
     pub fn daemon_exists(&self) -> bool {
         let addr = std::path::PathBuf::from("/tmp/gleipnird");
@@ -286,7 +302,7 @@ impl Backend {
 }
 
 pub struct RateLimitRule {
-    name: QString, // TODO: String
+    name: QString,
     limit: usize,
 }
 
