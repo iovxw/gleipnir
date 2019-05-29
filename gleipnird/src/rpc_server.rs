@@ -200,7 +200,6 @@ pub fn run(
         let clients = clients3.clone();
         let fut = async move {
             for (_id, client) in clients.lock().compat().await.unwrap().iter_mut() {
-                dbg!(logs.len());
                 let r = client
                     .on_packages(tarpc::context::current(), logs.clone())
                     .await;

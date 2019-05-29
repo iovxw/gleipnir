@@ -5,13 +5,16 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::sync::Arc;
 use std::thread;
 
 use crossbeam_channel;
-use gleipnir_interface::{Address, Device, PackageReport, Proto, Rule, RuleTarget};
+use gleipnir_interface::{Device, PackageReport, Proto, Rule, RuleTarget};
 use libc;
+use lru_time_cache::LruCache;
 use nfqueue;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
@@ -35,6 +38,96 @@ struct State {
     diag: netlink::SockDiag,
     rules: ablock::AbReader<rules::Rules>,
     pkt_logs: crossbeam_channel::Sender<PackageReport>,
+    cache: LruCache<u64, proc::Process>,
+}
+
+impl State {
+    fn query_process_cached(
+        &mut self,
+        device: Device,
+        protocol: Proto,
+        src: SocketAddr,
+        dst: SocketAddr,
+    ) -> Result<proc::Process, io::Error> {
+        let mut hasher = DefaultHasher::new();
+        (device, protocol, src, dst).hash(&mut hasher);
+        let lru_index = hasher.finish();
+
+        self.cache
+            .get(&lru_index)
+            .cloned()
+            .map(Ok)
+            .unwrap_or_else(|| {
+                let result = self.query_process(device, protocol, src, dst)?;
+                self.cache.insert(lru_index, result.clone());
+                Ok(result)
+            })
+    }
+    fn query_process(
+        &mut self,
+        device: Device,
+        protocol: Proto,
+        src: SocketAddr,
+        dst: SocketAddr,
+    ) -> Result<proc::Process, io::Error> {
+        let mut possible_sockets: [Option<(_, _)>; 3] = [None; 3];
+
+        match protocol {
+            Proto::Tcp => {
+                if device.is_input() {
+                    // for INPUT, dst is loacal address, src is remote address
+                    possible_sockets[0] = Some((dst, src));
+                } else {
+                    possible_sockets[0] = Some((src, dst));
+                }
+            }
+            Proto::Udp | Proto::UdpLite => {
+                // for UDP listener, the remote address is unspecified
+                let unspecified_addr = if src.is_ipv4() {
+                    Ipv4Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv6Addr::UNSPECIFIED.into()
+                };
+                let unspecified_socket = SocketAddr::new(unspecified_addr, 0);
+                if device.is_input() {
+                    possible_sockets[0] = Some((dst, src));
+                    possible_sockets[1] = Some((dst, unspecified_socket));
+                    possible_sockets[2] = Some((
+                        SocketAddr::new(unspecified_addr, dst.port()),
+                        unspecified_socket,
+                    ));
+                } else {
+                    possible_sockets[0] = Some((src, dst));
+                    possible_sockets[1] = Some((src, unspecified_socket));
+                    possible_sockets[2] = Some((
+                        SocketAddr::new(unspecified_addr, src.port()),
+                        unspecified_socket,
+                    ));
+                };
+            }
+        }
+
+        let mut diag_msg = None;
+        for &(local_address, remote_address) in possible_sockets
+            .iter()
+            .take_while(|x| Option::is_some(x))
+            .map(|x| x.as_ref().unwrap())
+        {
+            match self.diag.query(protocol, local_address, remote_address) {
+                Ok(r) => diag_msg = Some(r),
+                Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e),
+            };
+            break;
+        }
+
+        let diag_msg = match diag_msg {
+            Some(r) => r,
+            None => return Err(io::ErrorKind::NotFound.into()),
+        };
+
+        proc::get_proc_by_inode(diag_msg.idiag_inode).ok_or_else(|| io::ErrorKind::NotFound.into())
+    }
 }
 
 fn queue_callback(msg: nfqueue::Message, state: &mut State) {
@@ -72,49 +165,22 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
         }
         _ => unreachable!("package is neither IPv4 nor IPv6"),
     };
-    let mut possible_sockets: [Option<(_, _)>; 3] = [None; 3];
-    let (protocol, src, dst) = match protocol {
+
+    let (protocol, sport, dport) = match protocol {
         IpNextHeaderProtocols::Tcp => {
             let pkt = TcpPacket::new(ip_payload).expect("TcpPacket");
             let (sport, dport) = (pkt.get_source(), pkt.get_destination());
-            let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
-            if device.is_input() {
-                // for INPUT, dst is loacal address, src is remote address
-                possible_sockets[0] = Some((dst, src));
-            } else {
-                possible_sockets[0] = Some((src, dst));
-            }
-            (Proto::Tcp, src, dst)
+            (Proto::Tcp, sport, dport)
         }
         IpNextHeaderProtocols::Udp | IpNextHeaderProtocols::UdpLite => {
             let pkt = UdpPacket::new(ip_payload).expect("UdpPacket");
             let (sport, dport) = (pkt.get_source(), pkt.get_destination());
-            let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
-
-            // for UDP listener, the remote address is unspecified
-            let unspecified_addr = if saddr.is_ipv4() {
-                Ipv4Addr::UNSPECIFIED.into()
-            } else {
-                Ipv6Addr::UNSPECIFIED.into()
-            };
-            let unspecified_socket = SocketAddr::new(unspecified_addr, 0);
-            if device.is_input() {
-                possible_sockets[0] = Some((dst, src));
-                possible_sockets[1] = Some((dst, unspecified_socket));
-                possible_sockets[2] =
-                    Some((SocketAddr::new(unspecified_addr, dport), unspecified_socket));
-            } else {
-                possible_sockets[0] = Some((src, dst));
-                possible_sockets[1] = Some((src, unspecified_socket));
-                possible_sockets[2] =
-                    Some((SocketAddr::new(unspecified_addr, sport), unspecified_socket));
-            };
             let p = if protocol == IpNextHeaderProtocols::Udp {
                 Proto::Udp
             } else {
                 Proto::UdpLite
             };
-            (p, src, dst)
+            (p, sport, dport)
         }
         _ => {
             // ignore other protocol
@@ -122,47 +188,17 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
             return;
         }
     };
+    let (src, dst) = (SocketAddr::new(saddr, sport), SocketAddr::new(daddr, dport));
 
-    let mut diag_msg = None;
-    for &(local_address, remote_address) in possible_sockets
-        .iter()
-        .take_while(|x| Option::is_some(x))
-        .map(|x| x.as_ref().unwrap())
-    {
-        match state.diag.query(protocol, local_address, remote_address) {
-            Ok(r) => diag_msg = Some(r),
-            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(e) => {
-                eprintln!(
-                    "ERROR: {}, DEV: {:?}, PROTOCOL: {:?}, LOACALADDR: {}, REMOTEADDR: {}",
-                    e, device, protocol, local_address, remote_address,
-                );
-                msg.set_verdict(nfqueue::Verdict::Accept);
-                return;
-            }
-        };
-        break;
-    }
-
-    let diag_msg = match diag_msg {
-        Some(r) => r,
-        None => {
-            eprintln!(
-                "ERROR: not found, DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}",
-                device, protocol, src, dst
-            );
+    let proc = match state.query_process_cached(device, protocol, src, dst) {
+        Ok(r) => r,
+        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
+            dbg!("not found", device, protocol, src, dst);
             msg.set_verdict(nfqueue::Verdict::Accept);
             return;
         }
-    };
-
-    let proc = match proc::get_proc_by_inode(diag_msg.idiag_inode) {
-        Some(r) => r,
-        None => {
-            eprintln!(
-                "ERROR: failed to find process by inode {}, DEV: {:?}, PROTOCOL: {:?}, SRC: {}, DST: {}",
-                diag_msg.idiag_inode, device, protocol, src, dst
-            );
+        Err(e) => {
+            dbg!(e, device, protocol, src, dst);
             msg.set_verdict(nfqueue::Verdict::Accept);
             return;
         }
@@ -210,6 +246,7 @@ fn main() {
         diag: netlink::SockDiag::new().expect(""),
         rules,
         pkt_logs: sender,
+        cache: LruCache::with_capacity(2048),
     };
     let mut q = nfqueue::Queue::new(state);
 
