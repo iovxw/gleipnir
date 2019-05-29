@@ -193,12 +193,12 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
     let proc = match state.query_process_cached(device, protocol, src, dst) {
         Ok(r) => r,
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
-            dbg!("not found", device, protocol, src, dst);
+            eprintln!("NOT FOUND: {:?},\t{},\t{},\t{}", device, protocol, src, dst);
             msg.set_verdict(nfqueue::Verdict::Accept);
             return;
         }
         Err(e) => {
-            dbg!(e, device, protocol, src, dst);
+            eprintln!("ERROR: {},\t{:?},\t{},\t{},\t{}", e, device, protocol, src, dst);
             msg.set_verdict(nfqueue::Verdict::Accept);
             return;
         }
