@@ -193,24 +193,26 @@ pub fn run(
     let mut runtime = tokio::runtime::current_thread::Runtime::new().expect("tokio runtime");
     let handle = runtime.handle();
 
-    thread::spawn(move || {
-        while let Ok(log) = pkt_logs.recv() {
-            let clients = clients3.clone();
-            let fut = async move {
-                for (_id, client) in clients.lock().compat().await.unwrap().iter_mut() {
-                    let r = client
-                        .on_packages(tarpc::context::current(), vec![log.clone()])
-                        .await;
-                    if let Err(e) = r {
-                        dbg!(e);
-                    }
+    thread::spawn(move || loop {
+        let mut logs = Vec::new();
+        logs.push(pkt_logs.recv().expect("pkg_logs disconnected"));
+        logs.extend(pkt_logs.try_iter());
+        let clients = clients3.clone();
+        let fut = async move {
+            for (_id, client) in clients.lock().compat().await.unwrap().iter_mut() {
+                dbg!(logs.len());
+                let r = client
+                    .on_packages(tarpc::context::current(), logs.clone())
+                    .await;
+                if let Err(e) = r {
+                    dbg!(e);
                 }
-                Ok(())
-            };
-            handle
-                .spawn(Compat::new(fut.boxed()))
-                .expect("spawn future");
-        }
+            }
+            Ok(())
+        };
+        handle
+            .spawn(Compat::new(fut.boxed()))
+            .expect("spawn future");
     });
 
     rpc::init(tokio::executor::DefaultExecutor::current().compat());
