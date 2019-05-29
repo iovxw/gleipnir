@@ -4,6 +4,12 @@ import QtQuick.Controls 2.3
 import QtCharts 2.3
 
 Item {
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: backend.refresh_monitor()
+    }
     ChartView {
         id: history
         width: parent.width - traffic.width
@@ -98,7 +104,7 @@ Item {
                 spacing: 0
 
                 Pane {
-                    id: trafficTitle0
+                    id: logsTitle0
                     implicitWidth: 40
                     padding: 0
                     Label {
@@ -111,7 +117,7 @@ Item {
                     id: separator
                 }
                 Pane {
-                    id: trafficTitle1
+                    id: logsTitle1
                     topPadding: 0
                     bottomPadding: 0
                     Layout.fillWidth: true
@@ -123,7 +129,7 @@ Item {
                 }
                 ToolSeparator {}
                 Pane {
-                    id: trafficTitle2
+                    id: logsTitle2
                     implicitWidth: defaultFont.width * 2
                     padding: 0
                     Label {
@@ -134,7 +140,7 @@ Item {
                 }
                 ToolSeparator {}
                 Pane {
-                    id: trafficTitle3
+                    id: logsTitle3
                     implicitWidth: defaultFont.width * 15
                     padding: 0
                     Label {
@@ -145,7 +151,7 @@ Item {
                 }
                 ToolSeparator {}
                 Pane {
-                    id: trafficTitle4
+                    id: logsTitle4
                     implicitWidth: defaultFont.width * 7
                     padding: 0
                     Label {
@@ -156,7 +162,7 @@ Item {
                 }
                 ToolSeparator {}
                 Pane {
-                    id: trafficTitle5
+                    id: logsTitle5
                     implicitWidth: defaultFont.width * 10
                     padding: 0
                     Label {
@@ -167,7 +173,7 @@ Item {
                 }
                 ToolSeparator {}
                 Pane {
-                    id: trafficTitle6
+                    id: logsTitle6
                     implicitWidth: defaultFont.width * 4
                     padding: 0
                     Label {
@@ -186,44 +192,44 @@ Item {
 
                 delegate: Item {
                     width: parent.width
-                    height: trafficStatus.height
+                    height: logStatus.height
 
                     Rectangle {
-                        id: trafficStatus
+                        id: logStatus
                         width: 40
                         height: 40
                         color: if (model.dropped) { "red" } else { "green" }
                     }
                     Label {
-                        x: trafficTitle1.x
-                        width: trafficTitle1.width
+                        x: logsTitle1.x
+                        width: logsTitle1.width
                         clip: true
                         text: model.exe
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Label {
-                        x: trafficTitle2.x + (trafficTitle2.width - width) / 2
+                        x: logsTitle2.x + (logsTitle2.width - width) / 2
                         text: (model.input ?  "⇤" : "↦")
                         font.pointSize: defaultFont.font.pointSize * 1.5
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Label {
-                        x: trafficTitle3.x
+                        x: logsTitle3.x
                         text: model.addr
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Label {
-                        x: trafficTitle4.x + (trafficTitle4.width - width) / 2
+                        x: logsTitle4.x + (logsTitle4.width - width) / 2
                         text: model.protocol
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Label {
-                        x: trafficTitle5.x + trafficTitle5.width - width
+                        x: logsTitle5.x + logsTitle5.width - width
                         text: formatBytes(model.len)
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Label {
-                        x: trafficTitle6.x
+                        x: logsTitle6.x
                         text: model.matched_rule != 0 ? model.matched_rule : qsTr("Default Rule")
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -248,7 +254,7 @@ Item {
                 spacing: 0
 
                 Pane {
-                    id: historyTitle0
+                    id: trafficTitle0
                     topPadding: 0
                     bottomPadding: 0
                     Layout.fillWidth: true
@@ -258,10 +264,9 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                 }
-                ToolSeparator {
-                }
+                ToolSeparator {}
                 Pane {
-                    id: historyTitle1
+                    id: trafficTitle1
                     implicitWidth: defaultFont.width * 8
                     padding: 0
                     Label {
@@ -272,7 +277,7 @@ Item {
                 }
                 ToolSeparator {}
                 Pane {
-                    id: historyTitle2
+                    id: trafficTitle2
                     implicitWidth: defaultFont.width * 8
                     padding: 0
                     Label {
@@ -287,29 +292,18 @@ Item {
                 clip: true
                 Layout.fillHeight: true
                 Layout.fillWidth: true
-                model: ListModel {
-                    ListElement {
-                        exe: "/usr/bin/curl"
-                        sending: 1000000
-                        receiving: 90000000
-                    }
-                    ListElement {
-                        exe: "/usr/bin/curl"
-                        sending: 123
-                        receiving: 500000
-                    }
-                }
+                model: backend.traffic
                 delegate: Item {
                     width: parent.width
                     height: separator.implicitHeight
 
                     Label {
                         clip: true
-                        width: historyTitle0.width
-                        text: model.exe
+                        width: trafficTitle0.width
+                        text: model.exe.split("/").pop()
                     }
                     Label {
-                        x: historyTitle1.x + historyTitle1.width - width
+                        x: trafficTitle1.x + trafficTitle1.width - width
                         text: formatBytes(model.sending) + "/s"
                     }
                     Label {

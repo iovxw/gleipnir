@@ -1,7 +1,10 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::iter::FromIterator;
+use std::mem;
+use std::ops::AddAssign;
 use std::ops::RangeInclusive;
 use std::os::unix::net::UnixStream;
 use std::process::Command;
@@ -137,7 +140,10 @@ pub struct Backend {
     pub connect_to_daemon: qt_method!(fn(&mut self)),
     pub connect_to_daemon_error: qt_signal!(e: QString),
     pub daemon_exists: qt_method!(fn(&self) -> bool),
+    pub refresh_monitor: qt_method!(fn(&mut self)),
     pub logs: qt_property!(RefCell<SimpleListModel<QPackageLog>>; CONST),
+    pub traffic: qt_property!(RefCell<SimpleListModel<ProgramStatus>>; CONST),
+    current_traffic: HashMap<String, ProgramStatus>,
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -202,7 +208,10 @@ impl Backend {
             connect_to_daemon: Default::default(),
             connect_to_daemon_error: Default::default(),
             daemon_exists: Default::default(),
+            refresh_monitor: Default::default(),
             logs: Default::default(),
+            traffic: Default::default(),
+            current_traffic: Default::default(),
             runtime,
             client: None,
         }
@@ -300,11 +309,27 @@ impl Backend {
         let addr = std::path::PathBuf::from("/tmp/gleipnird");
         addr.exists() && UnixStream::connect(&addr).is_ok()
     }
+    pub fn refresh_monitor(&mut self) {
+        let empty_traffic: HashMap<_, _> = self
+            .current_traffic
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone_new()))
+            .collect();
+        let traffic = mem::replace(&mut self.current_traffic, empty_traffic);
+        let mut traffic: Vec<_> = traffic.into_iter().map(|(_k, v)| v).collect();
+        traffic.sort();
+        self.traffic.borrow_mut().reset_data(traffic);
+    }
     pub fn on_packages(&mut self, logs: Vec<PackageReport>) {
         let mut self_logs = self.logs.borrow_mut();
-        // TODO: extend_from_slice for SimpleListModel
-        for log in logs {
+        // TODO: impl extend_from_slice for SimpleListModel
+        for log in &logs {
             self_logs.push(log.into());
+            let status = self
+                .current_traffic
+                .entry(log.exe.clone())
+                .or_insert_with(|| ProgramStatus::new(&log.exe));
+            *status += log;
         }
     }
 }
@@ -320,16 +345,66 @@ pub struct QPackageLog {
     pub matched_rule: usize,
 }
 
-impl From<PackageReport> for QPackageLog {
-    fn from(v: PackageReport) -> Self {
+impl From<&'_ PackageReport> for QPackageLog {
+    fn from(v: &PackageReport) -> Self {
         Self {
             dropped: v.dropped,
             input: v.device.is_input(),
-            exe: v.exe.into(),
+            exe: (&*v.exe).into(),
             protocol: v.protocol.to_string().into(),
             addr: v.addr.to_string().into(),
             len: v.len,
             matched_rule: v.matched_rule.map(|x| x + 1).unwrap_or(0),
+        }
+    }
+}
+
+#[derive(SimpleListItem, Default, Clone, Eq, PartialEq)]
+pub struct ProgramStatus {
+    pub exe: QString,
+    pub sending: usize,
+    pub receiving: usize,
+}
+
+impl ProgramStatus {
+    fn new(program: &str) -> Self {
+        Self {
+            exe: program.into(),
+            ..Default::default()
+        }
+    }
+    fn clone_new(&self) -> Self {
+        Self {
+            exe: self.exe.clone(),
+            ..Default::default()
+        }
+    }
+}
+
+impl Ord for ProgramStatus {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.sending + self.receiving)
+            .cmp(&(other.sending + other.receiving))
+            .reverse()
+            .then_with(|| self.exe.to_slice().cmp(&other.exe.to_slice()))
+    }
+}
+
+impl PartialOrd for ProgramStatus {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl AddAssign<&'_ PackageReport> for ProgramStatus {
+    fn add_assign(&mut self, other: &PackageReport) {
+        if other.dropped {
+            return;
+        }
+        if other.device.is_input() {
+            self.receiving += other.len
+        } else {
+            self.sending += other.len
         }
     }
 }
