@@ -9,9 +9,6 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use std::sync::{atomic::AtomicBool, Arc};
-use std::thread;
-
 use cpp::*;
 use qmetaobject::*;
 

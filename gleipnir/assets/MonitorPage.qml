@@ -182,35 +182,8 @@ Item {
                 clip: true
                 Layout.fillHeight: true
                 Layout.fillWidth: true
-                model: ListModel {
-                    ListElement {
-                        dropped: false
-                        input: true
-                        exe: "/usr/bin/curl"
-                        protocol: "TCP"
-                        addr: "1.1.1.1:443"
-                        len: 42
-                        matched_rule: 1
-                    }
-                    ListElement {
-                        dropped: true
-                        input: false
-                        exe: "/usr/bin/curl"
-                        protocol: "TCP"
-                        addr: "1.1.1.1:443"
-                        len: 42
-                        matched_rule: 2
-                    }
-                    ListElement {
-                        dropped: false
-                        input: true
-                        exe: "/usr/bin/curl"
-                        protocol: "UDPLite"
-                        addr: "1.1.1.1:443"
-                        len: 42
-                        matched_rule: 1
-                    }
-                }
+                model: backend.logs
+
                 delegate: Item {
                     width: parent.width
                     height: trafficStatus.height
@@ -251,7 +224,7 @@ Item {
                     }
                     Label {
                         x: trafficTitle6.x
-                        text: model.matched_rule
+                        text: model.matched_rule != 0 ? model.matched_rule : qsTr("Default Rule")
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }

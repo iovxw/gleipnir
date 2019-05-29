@@ -2,6 +2,7 @@
 #![feature(proc_macro_hygiene)]
 
 use std::cmp::min;
+use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::ops::RangeInclusive;
@@ -59,6 +60,17 @@ pub enum Proto {
     Tcp = libc::IPPROTO_TCP as isize,
     Udp = libc::IPPROTO_UDP as isize,
     UdpLite = libc::IPPROTO_UDPLITE as isize,
+}
+
+impl fmt::Display for Proto {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match *self {
+            Proto::Tcp => "TCP",
+            Proto::Udp => "UDP",
+            Proto::UdpLite => "UDPLite",
+        };
+        f.write_str(s)
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]

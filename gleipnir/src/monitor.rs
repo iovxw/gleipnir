@@ -2,7 +2,6 @@ use std::fs;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::implementation::Backend;
 use futures::{
     compat::Executor01CompatExt,
     future::{self, Ready},
@@ -10,7 +9,6 @@ use futures::{
     FutureExt,
 };
 use gleipnir_interface::{monitor, unixtransport, PackageReport};
-use qmetaobject::QPointer;
 use rpc::context;
 use rpc::server::Server;
 
@@ -66,7 +64,8 @@ where
         .map_err(|e| {
             dbg!(e);
         })
-        .for_each(|_| futures::future::ready(()));
+        .for_each(|_| futures::future::ready(()))
+        .map(|()| MONITOR_RUNNING.store(false, Ordering::Release));
 
     rpc::init(tokio::executor::DefaultExecutor::current().compat());
     tokio::run(server.unit_error().boxed().compat());

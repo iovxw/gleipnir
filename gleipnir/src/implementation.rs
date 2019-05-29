@@ -137,6 +137,7 @@ pub struct Backend {
     pub connect_to_daemon: qt_method!(fn(&mut self)),
     pub connect_to_daemon_error: qt_signal!(e: QString),
     pub daemon_exists: qt_method!(fn(&self) -> bool),
+    pub logs: qt_property!(RefCell<SimpleListModel<QPackageLog>>; CONST),
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -178,7 +179,7 @@ impl Backend {
         ]);
         let default_target = 0;
 
-        let mut runtime = Runtime::new().unwrap();
+        let runtime = Runtime::new().unwrap();
 
         tarpc::init(tokio::executor::DefaultExecutor::current().compat());
 
@@ -201,6 +202,7 @@ impl Backend {
             connect_to_daemon: Default::default(),
             connect_to_daemon_error: Default::default(),
             daemon_exists: Default::default(),
+            logs: Default::default(),
             runtime,
             client: None,
         }
@@ -269,14 +271,16 @@ impl Backend {
         if !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {
             let ptr = QPointer::from(&*self);
             let on_packages_callback = queued_callback(move |logs| {
-                ptr.as_ref().map(|p| {
-                    let mutp = unsafe { &mut *(p as *const _ as *mut implementation::Backend) };
-                    mutp.on_packages(logs);
-                });
+                ptr.as_ref()
+                    .map(|p| {
+                        let mutp = unsafe { &mut *(p as *const _ as *mut implementation::Backend) };
+                        mutp.on_packages(logs);
+                    })
+                    .expect("QObject doesn't exist");
             });
 
             thread::spawn(|| {
-                monitor::run(on_packages_callback);
+                monitor::run(on_packages_callback).expect("Failed to start monitor");
             });
             while !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {}
         }
@@ -297,7 +301,36 @@ impl Backend {
         addr.exists() && UnixStream::connect(&addr).is_ok()
     }
     pub fn on_packages(&mut self, logs: Vec<PackageReport>) {
-        dbg!(logs);
+        let mut self_logs = self.logs.borrow_mut();
+        // TODO: extend_from_slice for SimpleListModel
+        for log in logs {
+            self_logs.push(log.into());
+        }
+    }
+}
+
+#[derive(SimpleListItem, Default)]
+pub struct QPackageLog {
+    pub dropped: bool,
+    pub input: bool,
+    pub exe: QString,
+    pub protocol: QString,
+    pub addr: QString,
+    pub len: usize,
+    pub matched_rule: usize,
+}
+
+impl From<PackageReport> for QPackageLog {
+    fn from(v: PackageReport) -> Self {
+        Self {
+            dropped: v.dropped,
+            input: v.device.is_input(),
+            exe: v.exe.into(),
+            protocol: v.protocol.to_string().into(),
+            addr: v.addr.to_string().into(),
+            len: v.len,
+            matched_rule: v.matched_rule.map(|x| x + 1).unwrap_or(0),
+        }
     }
 }
 
