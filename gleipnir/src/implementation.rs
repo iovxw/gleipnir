@@ -143,7 +143,10 @@ pub struct Backend {
     pub refresh_monitor: qt_method!(fn(&mut self)),
     pub logs: qt_property!(RefCell<SimpleListModel<QPackageLog>>; CONST),
     pub traffic: qt_property!(RefCell<SimpleListModel<ProgramStatus>>; CONST),
+    pub charts: qt_property!(QVariantList; NOTIFY charts_changed),
+    pub charts_changed: qt_signal!(),
     current_traffic: HashMap<String, ProgramStatus>,
+    traffic_history: HashMap<String, Vec<u32>>,
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -211,7 +214,10 @@ impl Backend {
             refresh_monitor: Default::default(),
             logs: Default::default(),
             traffic: Default::default(),
+            charts: Default::default(),
+            charts_changed: Default::default(),
             current_traffic: Default::default(),
+            traffic_history: Default::default(),
             runtime,
             client: None,
         }
@@ -316,8 +322,26 @@ impl Backend {
             .map(|(k, v)| (k.clone(), v.clone_new()))
             .collect();
         let traffic = mem::replace(&mut self.current_traffic, empty_traffic);
+        for (name, traffic) in &traffic {
+            let history = self.traffic_history.entry(name.to_owned()).or_insert_with(Vec::new);
+            history.push((traffic.sending + traffic.receiving)as u32);
+        }
         let mut traffic: Vec<_> = traffic.into_iter().map(|(_k, v)| v).collect();
         traffic.sort();
+        if !traffic.is_empty() {
+            let mut charts = Vec::with_capacity(5);
+            for proc in traffic.iter().take(5) {
+                let name = String::from_utf16_lossy(proc.exe.to_slice());
+                let chart = HistoryChart {
+                    name: proc.exe.clone(),
+                    model: QVariantList::from_iter(self.traffic_history[&name].clone())
+                };
+                let chart = chart.to_qvariant();
+                charts.push(chart);
+            }
+            self.charts = QVariantList::from_iter(charts);
+            self.charts_changed();
+        }
         self.traffic.borrow_mut().reset_data(traffic);
     }
     pub fn on_packages(&mut self, logs: Vec<PackageReport>) {
@@ -332,6 +356,12 @@ impl Backend {
             *status += log;
         }
     }
+}
+
+#[derive(QGadget, Default, Clone)]
+pub struct HistoryChart {
+    pub name: qt_property!(QString),
+    pub model: qt_property!(QVariantList),
 }
 
 #[derive(SimpleListItem, Default)]
@@ -359,7 +389,7 @@ impl From<&'_ PackageReport> for QPackageLog {
     }
 }
 
-#[derive(SimpleListItem, Default, Clone, Eq, PartialEq)]
+#[derive(SimpleListItem, Default, Clone, Eq, PartialEq, Debug)]
 pub struct ProgramStatus {
     pub exe: QString,
     pub sending: usize,

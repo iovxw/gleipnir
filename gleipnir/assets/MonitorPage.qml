@@ -8,7 +8,38 @@ Item {
         interval: 1000
         repeat: true
         running: true
-        onTriggered: backend.refresh_monitor()
+        onTriggered: {
+            backend.refresh_monitor()
+            refreshHistoryChart()
+        }
+    }
+    function refreshHistoryChart() {
+        const colors = ["209fdf", "99ca53", "f6a625", "6d5fd5", "bf593e"].reverse()
+        history.removeAllSeries()
+        const yValue = backend.charts.reduce((acc, v) => {
+            const max = Math.max(...v.model.slice(Math.max(v.model.length - history.length, 0)))
+            const [divisor, unit] = formatBytesRaw(max)
+            return (max > acc.max) ? { div: divisor, unit: unit, max: max } : acc
+        }, { max: -1 })
+
+        if (yValue.max == -1) {
+            return
+        }
+
+        yAxis.max = yValue.max / yValue.div
+        yAxis.labelFormat = "%.0f " + yValue.unit + "/s"
+        backend.charts.forEach((seriesData, i) => {
+            xAxis.max = Math.max(xAxis.max, seriesData.model.length - 1)
+            xAxis.min = xAxis.max - history.length
+
+            const name = seriesData.name.split("/").pop()
+            const series = history.createSeries(ChartView.SeriesTypeArea, name, xAxis, yAxis)
+            series.pointsVisible = true
+            series.color = "#AA" + colors[i]
+            seriesData.model.forEach((y, x) => {
+                series.upperSeries.append(x, y / yValue.div)
+            })
+        })
     }
     ChartView {
         id: history
@@ -17,75 +48,19 @@ Item {
         title: "History"
         antialiasing: true
 
+        property int length: 120
+
         ValueAxis {
-            id: valueAxisX
+            id: xAxis
             tickCount: 12
             labelFormat: "x"
         }
         ValueAxis {
-            id: valueAxisY
+            id: yAxis
             labelFormat: "%.0f KiB/S"
-            max: 5
         }
 
-        // Colors
-        // 209fdf
-        // 99ca53
-        // f6a625
-        // 6d5fd5
-        // bf593e
-
-        AreaSeries {
-            name: "/bin/one"
-            axisX: valueAxisX
-            axisY: valueAxisY
-            color: "#AA209fdf"
-            upperSeries: LineSeries {
-                XYPoint { x: 00; y: 4 }
-                XYPoint { x: 01; y: 1 }
-                XYPoint { x: 02; y: 1 }
-                XYPoint { x: 03; y: 2 }
-                XYPoint { x: 04; y: 1 }
-                XYPoint { x: 05; y: 0 }
-                XYPoint { x: 06; y: 3 }
-                XYPoint { x: 07; y: 1 }
-                XYPoint { x: 08; y: 4 }
-                XYPoint { x: 09; y: 4 }
-                XYPoint { x: 10; y: 4 }
-            }
-        }
-        AreaSeries {
-            name: "/bin/two"
-            axisX: valueAxisX
-            axisY: valueAxisY
-            color: "#AA99ca53"
-            upperSeries: LineSeries {
-                XYPoint { x: 00; y: 1 }
-                XYPoint { x: 01; y: 0 }
-                XYPoint { x: 02; y: 0 }
-                XYPoint { x: 03; y: 1 }
-                XYPoint { x: 04; y: 1 }
-                XYPoint { x: 05; y: 0 }
-                XYPoint { x: 06; y: 1 }
-                XYPoint { x: 07; y: 1 }
-                XYPoint { x: 08; y: 5 }
-                XYPoint { x: 09; y: 3 }
-                XYPoint { x: 10; y: 2 }
-            }
-        }
-        AreaSeries {
-            name: "/bin/three"
-            axisX: valueAxisX
-            axisY: valueAxisY
-            color: "#AAf6a625"
-            upperSeries: LineSeries {
-                XYPoint { x: 06; y: 0 }
-                XYPoint { x: 07; y: 3 }
-                XYPoint { x: 08; y: 1 }
-                XYPoint { x: 09; y: 0 }
-                XYPoint { x: 10; y: 2 }
-            }
-        }
+        Component.onCompleted: refreshHistoryChart()
     }
 
     Frame {
