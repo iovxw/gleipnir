@@ -14,10 +14,10 @@ Item {
         }
     }
     function refreshHistoryChart() {
-        const colors = ["209fdf", "99ca53", "f6a625", "6d5fd5", "bf593e"].reverse()
+        const colors = ["209fdf", "99ca53", "f6a625", "6d5fd5", "bf593e"]
         history.removeAllSeries()
         const yValue = backend.charts.reduce((acc, v) => {
-            const max = Math.max(...v.model.slice(Math.max(v.model.length - history.length, 0)))
+            const max = Math.max(...v.model.slice(Math.max(v.model.length - backend.chart_x_size, 0)))
             const [divisor, unit] = formatBytesRaw(max)
             return (max > acc.max) ? { div: divisor, unit: unit, max: max } : acc
         }, { max: -1 })
@@ -26,18 +26,20 @@ Item {
             return
         }
 
+        const maxHistoryLength = Math.max(...backend.charts.map((v) => v.model.length))
+        xAxis.max = maxHistoryLength - 1
+        xAxis.min = xAxis.max - backend.chart_x_size
+
         yAxis.max = yValue.max / yValue.div
         yAxis.labelFormat = "%.0f " + yValue.unit + "/s"
         backend.charts.forEach((seriesData, i) => {
-            xAxis.max = Math.max(xAxis.max, seriesData.model.length - 1)
-            xAxis.min = xAxis.max - history.length
-
             const name = seriesData.name.split("/").pop()
             const series = history.createSeries(ChartView.SeriesTypeArea, name, xAxis, yAxis)
             series.pointsVisible = true
             series.color = "#AA" + colors[i]
+            const xPadding = maxHistoryLength - seriesData.model.length
             seriesData.model.forEach((y, x) => {
-                series.upperSeries.append(x, y / yValue.div)
+                series.upperSeries.append(x + xPadding, y / yValue.div)
             })
         })
     }
@@ -48,8 +50,6 @@ Item {
         title: "History"
         antialiasing: true
 
-        property int length: 120
-
         ValueAxis {
             id: xAxis
             tickCount: 12
@@ -57,7 +57,6 @@ Item {
         }
         ValueAxis {
             id: yAxis
-            labelFormat: "%.0f KiB/S"
         }
 
         Component.onCompleted: refreshHistoryChart()

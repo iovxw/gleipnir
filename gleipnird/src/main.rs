@@ -198,7 +198,10 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
             return;
         }
         Err(e) => {
-            eprintln!("ERROR: {},\t{:?},\t{},\t{},\t{}", e, device, protocol, src, dst);
+            eprintln!(
+                "ERROR: {},\t{:?},\t{},\t{},\t{}",
+                e, device, protocol, src, dst
+            );
             msg.set_verdict(nfqueue::Verdict::Accept);
             return;
         }

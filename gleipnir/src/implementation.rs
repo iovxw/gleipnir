@@ -145,8 +145,10 @@ pub struct Backend {
     pub traffic: qt_property!(RefCell<SimpleListModel<ProgramStatus>>; CONST),
     pub charts: qt_property!(QVariantList; NOTIFY charts_changed),
     pub charts_changed: qt_signal!(),
+    pub chart_x_size: qt_property!(usize),
     current_traffic: HashMap<String, ProgramStatus>,
     traffic_history: HashMap<String, Vec<u32>>,
+    prev_proc_on_chart: Vec<String>,
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -216,8 +218,10 @@ impl Backend {
             traffic: Default::default(),
             charts: Default::default(),
             charts_changed: Default::default(),
+            chart_x_size: 80,
             current_traffic: Default::default(),
             traffic_history: Default::default(),
+            prev_proc_on_chart: vec![String::default(); 5],
             runtime,
             client: None,
         }
@@ -323,26 +327,43 @@ impl Backend {
             .collect();
         let traffic = mem::replace(&mut self.current_traffic, empty_traffic);
         for (name, traffic) in &traffic {
-            let history = self.traffic_history.entry(name.to_owned()).or_insert_with(Vec::new);
-            history.push((traffic.sending + traffic.receiving)as u32);
+            let history = self
+                .traffic_history
+                .entry(name.to_owned())
+                .or_insert_with(Vec::new);
+            history.push((traffic.sending + traffic.receiving) as u32);
         }
         let mut traffic: Vec<_> = traffic.into_iter().map(|(_k, v)| v).collect();
         traffic.sort();
-        if !traffic.is_empty() {
-            let mut charts = Vec::with_capacity(5);
-            for proc in traffic.iter().take(5) {
-                let name = String::from_utf16_lossy(proc.exe.to_slice());
-                let chart = HistoryChart {
-                    name: proc.exe.clone(),
-                    model: QVariantList::from_iter(self.traffic_history[&name].clone())
-                };
-                let chart = chart.to_qvariant();
-                charts.push(chart);
-            }
-            self.charts = QVariantList::from_iter(charts);
-            self.charts_changed();
-        }
         self.traffic.borrow_mut().reset_data(traffic);
+
+        let mut charts: Vec<(&String, u32)> = self
+            .traffic_history
+            .iter()
+            .map(|(name, history)| {
+                (
+                    name,
+                    history
+                        .iter()
+                        .skip(history.len().saturating_sub(self.chart_x_size))
+                        .take(self.chart_x_size)
+                        .sum(),
+                )
+            })
+            .collect();
+        charts.sort_by(|(_, a), (_, b)| a.cmp(&b).reverse());
+        let charts: Vec<_> = charts
+            .into_iter()
+            .map(|(k, _)| k)
+            .take(5)
+            .map(|proc| HistoryChart {
+                name: proc.as_str().into(),
+                model: QVariantList::from_iter(self.traffic_history[proc].clone()),
+            })
+            .map(|v| v.to_qvariant())
+            .collect();
+        self.charts = QVariantList::from_iter(charts);
+        self.charts_changed();
     }
     pub fn on_packages(&mut self, logs: Vec<PackageReport>) {
         let mut self_logs = self.logs.borrow_mut();
