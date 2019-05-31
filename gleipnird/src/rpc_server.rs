@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::fs;
 use std::io;
 use std::net::SocketAddr;
@@ -25,47 +24,15 @@ use slab::Slab;
 use crate::ablock::AbSetter;
 use crate::rules::Rules;
 
-thread_local! {
-    static RULES_SETTER: RefCell<Option<AbSetter<Rules>>> = RefCell::new(None);
-}
-#[derive(Clone, Copy)]
-struct LocalRulesSetter {
-    _private: (),
-}
-
-impl LocalRulesSetter {
-    fn init(v: AbSetter<Rules>) -> Self {
-        RULES_SETTER.with(|rules| {
-            if rules.borrow().is_some() {
-                panic!("LocalRulesSetter already initialized")
-            }
-            *rules.borrow_mut() = Some(v);
-        });
-        Self { _private: () }
-    }
-
-    fn borrow<'a>(&'a self) -> &'a AbSetter<Rules> {
-        // This is safe since self is never 'static
-        unsafe {
-            &*RULES_SETTER.with(|x| {
-                x.borrow()
-                    .as_ref()
-                    .expect("LocalRulesSetter is not thread safe!")
-                    as *const AbSetter<_>
-            })
-        }
-    }
-}
-
 #[derive(Clone)]
 struct Daemon {
     pid: u32,
     authenticated: Arc<AtomicBool>,
-    rules_setter: LocalRulesSetter,
+    rules_setter: Arc<Mutex<AbSetter<Rules>>>,
 }
 
 impl daemon::Service for Daemon {
-    type SetRulesFut = Ready<()>;
+    existential type SetRulesFut: Future<Output = ()>;
     existential type RegisterFut: Future<Output = bool>;
     type UnregisterFut = Ready<()>;
 
@@ -77,11 +44,12 @@ impl daemon::Service for Daemon {
         rate_rules: Vec<usize>,
     ) -> Self::SetRulesFut {
         dbg!(default_target, &rules, &rate_rules);
-        if self.authenticated.load(Ordering::Relaxed) {
-            let rules = Rules::new(default_target, rules, rate_rules);
-            self.rules_setter.borrow().set(rules);
+        async move {
+            if self.authenticated.load(Ordering::Relaxed) {
+                let rules = Rules::new(default_target, rules, rate_rules);
+                self.rules_setter.lock().compat().await.unwrap().set(rules);
+            }
         }
-        future::ready(())
     }
     fn register(self, _: context::Context) -> Self::RegisterFut {
         use futures::task::Poll;
@@ -121,7 +89,7 @@ pub fn run(
         }
     }
 
-    let rules_setter = LocalRulesSetter::init(rules_setter);
+    let rules_setter = Arc::new(Mutex::new(rules_setter));
 
     let transport = unixtransport::listen(&addr)?;
 
@@ -172,6 +140,7 @@ pub fn run(
             dbg!(pid);
 
             let clients = clients.clone();
+            let rules_setter = rules_setter.clone();
             tokio::executor::spawn(Compat::new(
                 async move {
                     let _guard = ClientGuard { clients, client_id };
@@ -188,10 +157,11 @@ pub fn run(
                     .boxed(),
             ));
         })
+        .map_err(|e: io::Error| eprintln!("RPC Server: {}", e))
         .for_each(|_| futures::future::ready(()));
 
-    let mut runtime = tokio::runtime::current_thread::Runtime::new().expect("tokio runtime");
-    let handle = runtime.handle();
+    let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let executor = runtime.executor();
 
     thread::spawn(move || loop {
         let mut logs = Vec::new();
@@ -209,14 +179,13 @@ pub fn run(
             }
             Ok(())
         };
-        handle
-            .spawn(Compat::new(fut.boxed()))
-            .expect("spawn future");
+        executor.spawn(Compat::new(fut.boxed()));
     });
 
-    rpc::init(tokio::executor::DefaultExecutor::current().compat());
-    runtime.spawn(server.unit_error().boxed().compat());
-    runtime.run().expect("run tokio runtime");
+    rpc::init(runtime.executor().compat());
+    runtime
+        .block_on_all(server.unit_error().boxed().compat())
+        .expect("run tokio runtime");
 
     Ok(())
 }
