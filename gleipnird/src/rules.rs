@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use lru_time_cache::LruCache;
 use treebitmap::IpLookupTable;
 
-use gleipnir_interface::{Address, Device, Proto, Rule, RuleTarget};
+use gleipnir_interface::{Address, Device, Proto, Rule, RuleTarget, Rules};
 
 struct Bucket {
     bytes: usize,
@@ -47,7 +47,7 @@ impl Bucket {
     }
 }
 
-pub struct Rules {
+pub struct IndexedRules {
     device: HashMap<Device, Vec<usize>>,
     any_device: Vec<usize>,
     proto: HashMap<Proto, Vec<usize>>,
@@ -67,7 +67,7 @@ pub struct Rules {
     cache: RefCell<LruCache<u64, (Option<usize>, RuleTarget)>>,
 }
 
-impl Rules {
+impl IndexedRules {
     pub fn new(default_target: RuleTarget, rules: Vec<Rule>, rate_rules: Vec<usize>) -> Self {
         macro_rules! insert_rule {
             ($target: tt, $rule: tt, $name: tt, $any: tt,  $index: tt) => {
@@ -223,6 +223,16 @@ impl Rules {
     }
 }
 
+impl From<Rules> for IndexedRules {
+    fn from(r: Rules) -> Self {
+        Self::new(
+            r.default_target,
+            r.rules,
+            r.rate_rules.into_iter().map(|r| r.limit).collect(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -289,7 +299,7 @@ mod test {
         v4_hashmap.insert(([2, 2, 2, 2], 32), vec![3]);
         v4_hashmap.insert(([0, 0, 0, 0], 0), vec![4]);
 
-        let r: Rules = Rules::new(RuleTarget::Drop, raw_rules.clone(), vec![]);
+        let r = IndexedRules::new(RuleTarget::Drop, raw_rules.clone(), vec![]);
         assert_eq!(r.device, device);
         assert_eq!(r.any_device, vec![]);
         assert_eq!(r.proto, proto);

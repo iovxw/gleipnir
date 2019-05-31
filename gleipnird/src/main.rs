@@ -1,6 +1,7 @@
 #![feature(const_fn)]
 #![feature(async_await)]
 #![feature(existential_type)]
+#![feature(try_blocks)]
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -29,14 +30,14 @@ mod proc;
 pub mod rpc_server;
 mod rules;
 
-use rules::Rules;
+use rules::IndexedRules;
 
 const QUEUE_ID: u16 = 786;
 const MAX_IP_PKG_LEN: u32 = 0xFFFF;
 
 struct State {
     diag: netlink::SockDiag,
-    rules: ablock::AbReader<rules::Rules>,
+    rules: ablock::AbReader<IndexedRules>,
     pkt_logs: crossbeam_channel::Sender<PackageReport>,
     cache: LruCache<u64, proc::Process>,
 }
@@ -232,7 +233,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
 }
 
 fn main() {
-    let (rules, rules_setter) = ablock::AbLock::new(Rules::new(
+    let (rules, rules_setter) = ablock::AbLock::new(IndexedRules::new(
         RuleTarget::Accept,
         vec![Rule {
             exe: Some("/usr/bin/curl".into()),

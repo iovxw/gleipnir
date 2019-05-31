@@ -16,42 +16,56 @@ use futures::{
     FutureExt,
 };
 use futures_locks::Mutex;
-use gleipnir_interface::{daemon, monitor, unixtransport, PackageReport, Rule, RuleTarget};
+use gleipnir_interface::{daemon, monitor, unixtransport, PackageReport, Rule, RuleTarget, Rules};
 use rpc::context;
 use rpc::server::Server;
 use slab::Slab;
 
 use crate::ablock::AbSetter;
-use crate::rules::Rules;
+use crate::rules::IndexedRules;
 
 #[derive(Clone)]
 struct Daemon {
     pid: u32,
     authenticated: Arc<AtomicBool>,
-    rules_setter: Arc<Mutex<AbSetter<Rules>>>,
+    rules_setter: Arc<Mutex<AbSetter<IndexedRules>>>,
+    clients: Arc<Mutex<Slab<monitor::Client>>>,
+    client_id: Arc<Mutex<Option<usize>>>,
+}
+
+impl Drop for Daemon {
+    fn drop(&mut self) {
+        // TODO: a better way, don't let client_id cloned outside Daemon
+        if Arc::strong_count(&self.client_id) > 1 {
+            return;
+        }
+        let mut client_id = match block_on(self.client_id.lock().compat()) {
+            Ok(r) => r,
+            _ => return,
+        };
+        if let Some(client_id) = client_id.take() {
+            dbg!("dropped");
+            block_on(self.clients.lock().compat())
+                .unwrap()
+                .remove(client_id);
+        }
+    }
 }
 
 impl daemon::Service for Daemon {
     existential type SetRulesFut: Future<Output = ()>;
-    existential type RegisterFut: Future<Output = bool>;
-    type UnregisterFut = Ready<()>;
+    existential type UnlockFut: Future<Output = bool>;
+    existential type InitMonitorFut: Future<Output = ()>;
 
-    fn set_rules(
-        self,
-        _: context::Context,
-        default_target: RuleTarget,
-        rules: Vec<Rule>,
-        rate_rules: Vec<usize>,
-    ) -> Self::SetRulesFut {
-        dbg!(default_target, &rules, &rate_rules);
+    fn set_rules(self, _: context::Context, rules: Rules) -> Self::SetRulesFut {
         async move {
             if self.authenticated.load(Ordering::Relaxed) {
-                let rules = Rules::new(default_target, rules, rate_rules);
+                let rules = IndexedRules::from(rules);
                 self.rules_setter.lock().compat().await.unwrap().set(rules);
             }
         }
     }
-    fn register(self, _: context::Context) -> Self::RegisterFut {
+    fn unlock(self, _: context::Context) -> Self::UnlockFut {
         use futures::task::Poll;
         use tokio::prelude::Async;
         async move {
@@ -70,14 +84,26 @@ impl daemon::Service for Daemon {
             authenticated
         }
     }
-    fn unregister(self, _: context::Context) -> Self::UnregisterFut {
-        self.authenticated.store(false, Ordering::Relaxed);
-        future::ready(())
+    fn init_monitor(self, _: context::Context, socket_path: String) -> Self::InitMonitorFut {
+        async move {
+            let r: Result<(), io::Error> = try {
+                let mut clients = self.clients.lock().compat().await.unwrap();
+                let mut client_id = self.client_id.lock().compat().await.unwrap();
+                if client_id.is_some() {
+                    // TODO: return a error, can not initialize multiple times
+                    return;
+                }
+
+                let transport = unixtransport::connect(&socket_path).await?;
+                let client = monitor::new_stub(tarpc::client::Config::default(), transport).await?;
+                *client_id = Some(clients.insert(client));
+            };
+        }
     }
 }
 
 pub fn run(
-    rules_setter: AbSetter<Rules>,
+    rules_setter: AbSetter<IndexedRules>,
     pkt_logs: crossbeam_channel::Receiver<PackageReport>,
 ) -> Result<(), std::io::Error> {
     let addr = std::path::PathBuf::from("/tmp/gleipnird");
@@ -102,35 +128,7 @@ pub fn run(
 
     let server = Server::default()
         .incoming(transport)
-        .and_then(move |channel| {
-            let clients2 = clients2.clone();
-            async move {
-                let mut clients = clients2.lock().compat().await.unwrap();
-                if !clients.is_empty() {
-                    // TODO: log
-                    return Err(io::ErrorKind::Other.into());
-                }
-
-                let transport = unixtransport::connect("/tmp/gleipnir").await?;
-                let client = monitor::new_stub(tarpc::client::Config::default(), transport).await?;
-                let client_id = clients.insert(client);
-
-                Ok((channel, client_id))
-            }
-        })
-        .map_ok(move |(channel, client_id)| {
-            struct ClientGuard {
-                clients: Arc<Mutex<Slab<monitor::Client>>>,
-                client_id: usize,
-            }
-            impl Drop for ClientGuard {
-                fn drop(&mut self) {
-                    block_on(self.clients.lock().compat())
-                        .unwrap()
-                        .remove(self.client_id);
-                }
-            }
-
+        .map_ok(move |(channel)| {
             // This is a hack, see unixtransport module
             let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
                 (*addr.ip()).into()
@@ -143,12 +141,13 @@ pub fn run(
             let rules_setter = rules_setter.clone();
             tokio::executor::spawn(Compat::new(
                 async move {
-                    let _guard = ClientGuard { clients, client_id };
                     channel
                         .respond_with(daemon::serve(Daemon {
                             pid,
                             authenticated: Arc::new(AtomicBool::new(false)),
                             rules_setter,
+                            clients,
+                            client_id: Arc::new(Mutex::new(None)),
                         }))
                         .await;
                     Ok(())

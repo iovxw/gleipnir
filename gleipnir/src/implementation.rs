@@ -15,7 +15,9 @@ use futures::{
     compat::{Compat, Executor01CompatExt},
     future::FutureExt,
 };
-use gleipnir_interface::{daemon, unixtransport, Device, PackageReport, Proto, Rule, RuleTarget};
+use gleipnir_interface::{
+    daemon, unixtransport, Device, PackageReport, Proto, RateLimitRule, Rule, RuleTarget, Rules,
+};
 use qmetaobject::*;
 use tarpc;
 use tokio::runtime::current_thread::Runtime;
@@ -238,14 +240,14 @@ impl Backend {
                 self.client
                     .as_mut()
                     .expect("")
-                    .register(tarpc::context::current())
+                    .unlock(tarpc::context::current())
                     .boxed(),
             ))
             .unwrap();
         dbg!(authed);
 
         let rules: Vec<Rule> = self.rules.borrow().iter().map(Into::into).collect();
-        let rate_rules: Vec<usize> = self.rate_rules.borrow().iter().map(|v| v.limit).collect();
+        let rate_rules = (&**self.rate_rules.borrow()).to_vec();
 
         let default_target = match self.default_target {
             0 => RuleTarget::Accept,
@@ -253,12 +255,18 @@ impl Backend {
             n => RuleTarget::RateLimit(n - 2),
         };
 
+        let rules = Rules {
+            rules,
+            rate_rules,
+            default_target,
+        };
+
         self.runtime
             .block_on(Compat::new(
                 self.client
                     .as_mut()
                     .expect("")
-                    .set_rules(tarpc::context::current(), default_target, rules, rate_rules)
+                    .set_rules(tarpc::context::current(), rules)
                     .boxed(),
             ))
             .unwrap();
@@ -313,13 +321,19 @@ impl Backend {
             });
             while !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {}
         }
-        let client = self.runtime.block_on(Compat::new(
+        let client: Result<daemon::Client, io::Error> = self.runtime.block_on(Compat::new(
             async {
                 let transport = unixtransport::connect("/tmp/gleipnird").await?;
-                daemon::new_stub(tarpc::client::Config::default(), transport).await
+                let mut client =
+                    daemon::new_stub(tarpc::client::Config::default(), transport).await?;
+                client
+                    .init_monitor(tarpc::context::current(), "/tmp/gleipnir".to_string())
+                    .await;
+                Ok(client)
             }
                 .boxed(),
-        ))?;
+        ));
+        let client = client?;
         self.client = Some(client);
         self.daemon_connected = true;
         self.daemon_connected_changed();
@@ -468,11 +482,6 @@ impl AddAssign<&'_ PackageReport> for ProgramStatus {
             self.sending += other.len
         }
     }
-}
-
-pub struct RateLimitRule {
-    name: QString,
-    limit: usize,
 }
 
 impl MutListItem for RateLimitRule {

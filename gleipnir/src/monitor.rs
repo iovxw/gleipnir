@@ -8,7 +8,7 @@ use futures::{
     prelude::*,
     FutureExt,
 };
-use gleipnir_interface::{monitor, unixtransport, PackageReport};
+use gleipnir_interface::{monitor, unixtransport, PackageReport, Rules};
 use rpc::context;
 use rpc::server::Server;
 
@@ -27,8 +27,12 @@ where
     F: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
 {
     type OnPackagesFut = Ready<()>;
+    type OnRulesUpdatedFut = Ready<()>;
     fn on_packages(self, _: context::Context, logs: Vec<PackageReport>) -> Self::OnPackagesFut {
         (self.on_packages)(logs);
+        future::ready(())
+    }
+    fn on_rules_updated(self, _: context::Context, rules: Rules) -> Self::OnRulesUpdatedFut {
         future::ready(())
     }
 }
