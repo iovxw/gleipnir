@@ -97,6 +97,8 @@ Pane {
 
         DelegateModel {
             property bool dragActive: false
+            property int dragSrc: 0
+            property int dragDst: 0
             id: visualModel
             model: backend.rules
             delegate: MouseArea {
@@ -105,6 +107,7 @@ Pane {
                 height: content.height
                 width: parent.width
 
+
                 MouseArea {
                     id: dragArea
 
@@ -112,16 +115,26 @@ Pane {
 
                     drag.target: content
                     drag.axis: Drag.YAxis
-                    drag.onActiveChanged: visualModel.dragActive = drag.active
+                    drag.onActiveChanged: {
+                        visualModel.dragActive = drag.active
+                        if (drag.active) {
+                            visualModel.dragSrc = ruleRow.DelegateModel.itemsIndex
+                        } else {
+                            // drag finished, update inner model
+                            backend.swap_rule(visualModel.dragSrc, visualModel.dragDst)
+                        }
+                    }
                 }
 
                 DropArea {
                     anchors.fill: parent
 
-                    onEntered: visualModel.items.move(
-                        drag.source.parent.DelegateModel.itemsIndex,
-                        dragArea.parent.DelegateModel.itemsIndex,
-                    )
+                    onEntered: {
+                        const s = drag.source.parent.DelegateModel.itemsIndex
+                        const d = dragArea.parent.DelegateModel.itemsIndex
+                        visualModel.dragDst = d
+                        visualModel.items.move(s, d)
+                    }
                 }
 
                 Pane {
@@ -293,7 +306,7 @@ Pane {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: if (parent.confirm) {
-                                visualModel.items.remove(ruleRow.DelegateModel.itemsIndex)
+                                backend.remove_rule(ruleRow.DelegateModel.itemsIndex)
                             } else {
                                 parent.confirm = true
                             }

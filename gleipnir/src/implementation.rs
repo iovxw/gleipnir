@@ -135,6 +135,8 @@ pub struct Backend {
     pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
     pub daemon_connected_changed: qt_signal!(),
     pub new_rule: qt_method!(fn(&mut self)),
+    pub swap_rule: qt_method!(fn(&mut self, a: usize, b: usize)),
+    pub remove_rule: qt_method!(fn(&mut self, i: usize)),
     pub start_daemon: qt_method!(fn(&mut self)),
     pub start_daemon_error: qt_signal!(e: QString),
     pub connect_to_daemon: qt_method!(fn(&mut self)),
@@ -208,6 +210,8 @@ impl Backend {
             daemon_connected: false,
             daemon_connected_changed: Default::default(),
             new_rule: Default::default(),
+            swap_rule: Default::default(),
+            remove_rule: Default::default(),
             start_daemon: Default::default(),
             start_daemon_error: Default::default(),
             connect_to_daemon: Default::default(),
@@ -262,6 +266,12 @@ impl Backend {
 
     pub fn new_rule(&mut self) {
         self.rules.borrow_mut().push(QRule::default());
+    }
+    pub fn swap_rule(&mut self, a: usize, b: usize) {
+        self.rules.borrow_mut().swap(a, b);
+    }
+    pub fn remove_rule(&mut self, i: usize) {
+        self.rules.borrow_mut().remove(i);
     }
     pub fn start_daemon(&mut self) {
         // To Packager: set a START_GLEIPNIRD_CMD env at compile time to override the default

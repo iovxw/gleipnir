@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use qmetaobject::*;
 
@@ -39,12 +39,6 @@ impl<T: MutListItem> Deref for MutListModel<T> {
     }
 }
 
-impl<T: MutListItem> DerefMut for MutListModel<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.values
-    }
-}
-
 impl<T: MutListItem> MutListModel<T> {
     pub fn insert(&mut self, index: usize, element: T) {
         (self as &mut QAbstractListModel).begin_insert_rows(index as i32, index as i32);
@@ -55,10 +49,18 @@ impl<T: MutListItem> MutListModel<T> {
         let idx = self.values.len();
         self.insert(idx, value);
     }
-    pub fn remove(&mut self, index: usize) {
+    pub fn remove(&mut self, index: usize) -> T {
         (self as &mut QAbstractListModel).begin_remove_rows(index as i32, index as i32);
-        self.values.remove(index);
+        let item = self.values.remove(index);
         (self as &mut QAbstractListModel).end_remove_rows();
+        return item;
+    }
+    pub fn swap(&mut self, a: usize, b: usize) {
+        self.values.swap(a, b);
+        let idx = (self as &mut QAbstractListModel).row_index(a as i32);
+        (self as &mut QAbstractListModel).data_changed(idx, idx);
+        let idx = (self as &mut QAbstractListModel).row_index(b as i32);
+        (self as &mut QAbstractListModel).data_changed(idx, idx);
     }
     pub fn change_line(&mut self, index: usize, value: T) {
         self.values[index] = value;
