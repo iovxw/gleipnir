@@ -68,9 +68,13 @@ impl<T: MutListItem> MutListModel<T> {
         (self as &mut QAbstractListModel).data_changed(idx, idx);
     }
     pub fn reset_data(&mut self, data: Vec<T>) {
+        dbg!(0);
         (self as &mut QAbstractListModel).begin_reset_model();
+        dbg!(1);
         self.values = data;
+        dbg!(2);
         (self as &mut QAbstractListModel).end_reset_model();
+        dbg!(3);
     }
 }
 

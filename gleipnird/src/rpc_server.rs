@@ -22,6 +22,7 @@ use rpc::server::Server;
 use slab::Slab;
 
 use crate::ablock::AbSetter;
+use crate::config;
 use crate::rules::IndexedRules;
 
 #[derive(Clone)]
@@ -29,6 +30,7 @@ struct Daemon {
     pid: u32,
     authenticated: Arc<AtomicBool>,
     rules_setter: Arc<Mutex<AbSetter<IndexedRules>>>,
+    rules: Arc<Mutex<Rules>>,
     clients: Arc<Mutex<Slab<monitor::Client>>>,
     client_id: Arc<Mutex<Option<usize>>>,
 }
@@ -60,8 +62,35 @@ impl daemon::Service for Daemon {
     fn set_rules(self, _: context::Context, rules: Rules) -> Self::SetRulesFut {
         async move {
             if self.authenticated.load(Ordering::Relaxed) {
-                let rules = IndexedRules::from(rules);
-                self.rules_setter.lock().compat().await.unwrap().set(rules);
+                let indexed_rules = IndexedRules::from(rules.clone());
+                self.rules_setter
+                    .lock()
+                    .compat()
+                    .await
+                    .unwrap()
+                    .set(indexed_rules);
+                config::save_rules(&rules);
+                *self.rules.lock().compat().await.unwrap() = rules.clone();
+                let boardcast = async move {
+                    let self_id = self.client_id.lock().compat().await.unwrap();
+                    if let Some(self_id) = &*self_id {
+                        let mut clients = self.clients.lock().compat().await.unwrap();
+                        for (id, client) in clients.iter_mut() {
+                            if id == *self_id {
+                                continue;
+                            }
+                            if let Err(e) = client
+                                .on_rules_updated(tarpc::context::current(), rules.clone())
+                                .await
+                            {
+                                // TODO: remove client from clients?
+                                // dbg!(e);
+                            }
+                        }
+                    }
+                    Ok(())
+                };
+                tokio::spawn(Compat::new(boardcast.boxed()));
             }
         }
     }
@@ -86,7 +115,7 @@ impl daemon::Service for Daemon {
     }
     fn init_monitor(self, _: context::Context, socket_path: String) -> Self::InitMonitorFut {
         async move {
-            let r: Result<(), io::Error> = try {
+            let r: Result<(), failure::Error> = try {
                 let mut clients = self.clients.lock().compat().await.unwrap();
                 let mut client_id = self.client_id.lock().compat().await.unwrap();
                 if client_id.is_some() {
@@ -95,14 +124,23 @@ impl daemon::Service for Daemon {
                 }
 
                 let transport = unixtransport::connect(&socket_path).await?;
-                let client = monitor::new_stub(tarpc::client::Config::default(), transport).await?;
+                let mut client =
+                    monitor::new_stub(tarpc::client::Config::default(), transport).await?;
+                let rules = self.rules.lock().compat().await.unwrap().clone();
+                client
+                    .on_rules_updated(tarpc::context::current(), rules)
+                    .await?;
                 *client_id = Some(clients.insert(client));
             };
+            if let Err(e) = r {
+                dbg!(e);
+            }
         }
     }
 }
 
 pub fn run(
+    rules: Rules,
     rules_setter: AbSetter<IndexedRules>,
     pkt_logs: crossbeam_channel::Receiver<PackageReport>,
 ) -> Result<(), std::io::Error> {
@@ -116,6 +154,7 @@ pub fn run(
     }
 
     let rules_setter = Arc::new(Mutex::new(rules_setter));
+    let rules = Arc::new(Mutex::new(rules));
 
     let transport = unixtransport::listen(&addr)?;
 
@@ -124,11 +163,10 @@ pub fn run(
 
     let clients = Arc::new(Mutex::new(Slab::new()));
     let clients2 = clients.clone();
-    let clients3 = clients.clone();
 
     let server = Server::default()
         .incoming(transport)
-        .map_ok(move |(channel)| {
+        .map_ok(move |channel| {
             // This is a hack, see unixtransport module
             let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
                 (*addr.ip()).into()
@@ -139,6 +177,7 @@ pub fn run(
 
             let clients = clients.clone();
             let rules_setter = rules_setter.clone();
+            let rules = rules.clone();
             tokio::executor::spawn(Compat::new(
                 async move {
                     channel
@@ -146,6 +185,7 @@ pub fn run(
                             pid,
                             authenticated: Arc::new(AtomicBool::new(false)),
                             rules_setter,
+                            rules,
                             clients,
                             client_id: Arc::new(Mutex::new(None)),
                         }))
@@ -166,14 +206,14 @@ pub fn run(
         let mut logs = Vec::new();
         logs.push(pkt_logs.recv().expect("pkg_logs disconnected"));
         logs.extend(pkt_logs.try_iter());
-        let clients = clients3.clone();
+        let clients = clients2.clone();
         let fut = async move {
             for (_id, client) in clients.lock().compat().await.unwrap().iter_mut() {
                 let r = client
                     .on_packages(tarpc::context::current(), logs.clone())
                     .await;
                 if let Err(e) = r {
-                    dbg!(e);
+                    // dbg!(e);
                 }
             }
             Ok(())

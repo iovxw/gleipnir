@@ -24,6 +24,7 @@ use pnet::packet::{
 #[macro_use]
 mod utils;
 mod ablock;
+mod config;
 mod netlink;
 mod polkit;
 mod proc;
@@ -233,29 +234,23 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
 }
 
 fn main() {
-    let (rules, rules_setter) = ablock::AbLock::new(IndexedRules::new(
-        RuleTarget::Accept,
-        vec![Rule {
-            exe: Some("/usr/bin/curl".into()),
-            port: Some(80..=80),
-            target: RuleTarget::Drop,
-            device: None,
-            proto: None,
-            subnet: ("192.168.1.1".parse().unwrap(), 32),
-        }],
-        vec![],
-    ));
+    let rules = config::load_rules().expect("Failed to load rules");
+
+    let (rules_reader, rules_setter) = ablock::AbLock::new(IndexedRules::from(rules.clone()));
     let (sender, receiver) = crossbeam_channel::unbounded();
     let state = State {
         diag: netlink::SockDiag::new().expect(""),
-        rules,
+        rules: rules_reader,
         pkt_logs: sender,
         cache: LruCache::with_capacity(2048),
     };
     let mut q = nfqueue::Queue::new(state);
 
     thread::spawn(|| {
-        rpc_server::run(rules_setter, receiver);
+        if let Err(e) = rpc_server::run(rules, rules_setter, receiver) {
+            dbg!(e);
+            std::process::exit(1);
+        }
     });
 
     q.open();

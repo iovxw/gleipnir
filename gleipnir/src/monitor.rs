@@ -15,16 +15,19 @@ use rpc::server::Server;
 pub static MONITOR_RUNNING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
-struct Monitor<F>
+struct Monitor<F0, F1>
 where
-    F: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
+    F0: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
+    F1: Fn(Rules) + Send + Sync + Clone + 'static,
 {
-    on_packages: F,
+    on_packages: F0,
+    on_rules_updated: F1,
 }
 
-impl<F> monitor::Service for Monitor<F>
+impl<F0, F1> monitor::Service for Monitor<F0, F1>
 where
-    F: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
+    F0: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
+    F1: Fn(Rules) + Send + Sync + Clone + 'static,
 {
     type OnPackagesFut = Ready<()>;
     type OnRulesUpdatedFut = Ready<()>;
@@ -33,13 +36,15 @@ where
         future::ready(())
     }
     fn on_rules_updated(self, _: context::Context, rules: Rules) -> Self::OnRulesUpdatedFut {
+        (self.on_rules_updated)(rules);
         future::ready(())
     }
 }
 
-pub fn run<F>(on_packages: F) -> Result<(), std::io::Error>
+pub fn run<F0, F1>(on_packages: F0, on_rules_updated: F1) -> Result<(), std::io::Error>
 where
-    F: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
+    F0: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
+    F1: Fn(Rules) + Send + Sync + Clone + 'static,
 {
     let addr = std::path::PathBuf::from("/tmp/gleipnir");
     if addr.exists() {
@@ -57,9 +62,13 @@ where
         .incoming(transport)
         .and_then(move |channel| {
             let on_packages = on_packages.clone();
+            let on_rules_updated = on_rules_updated.clone();
             async move {
                 channel
-                    .respond_with(monitor::serve(Monitor { on_packages }))
+                    .respond_with(monitor::serve(Monitor {
+                        on_packages,
+                        on_rules_updated,
+                    }))
                     .await;
                 Ok(())
             }

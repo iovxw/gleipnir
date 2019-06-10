@@ -38,6 +38,50 @@ pub struct QRule {
     pub target: qt_property!(usize),
 }
 
+impl From<&Rule> for QRule {
+    fn from(rule: &Rule) -> Self {
+        let device = match rule.device {
+            None => 0,
+            Some(Device::Input) => 1,
+            Some(Device::Output) => 2,
+        };
+        let proto = match rule.proto {
+            None => 0,
+            Some(Proto::Tcp) => 1,
+            Some(Proto::Udp) => 2,
+            Some(Proto::UdpLite) => 3,
+        };
+        let exe = rule
+            .exe
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or_default()
+            .into();
+        let (port_begin, port_end) = rule
+            .port
+            .clone()
+            .map(RangeInclusive::into_inner)
+            .unwrap_or_default();
+        let addr = rule.subnet.0.to_string().into();
+        let mask = rule.subnet.1;
+        let target = match rule.target {
+            RuleTarget::Accept => 0,
+            RuleTarget::Drop => 1,
+            RuleTarget::RateLimit(n) => n + 2,
+        };
+        Self {
+            device,
+            proto,
+            exe,
+            port_begin,
+            port_end,
+            addr,
+            mask,
+            target,
+        }
+    }
+}
+
 impl From<&QRule> for Rule {
     fn from(qrule: &QRule) -> Self {
         let device = match qrule.device {
@@ -131,7 +175,8 @@ pub struct Backend {
     pub rules: qt_property!(RefCell<MutListModel<QRule>>; CONST),
     pub targets: qt_property!(QVariantList; NOTIFY targets_changed),
     pub targets_changed: qt_signal!(),
-    pub default_target: qt_property!(usize),
+    pub default_target: qt_property!(usize; NOTIFY default_target_changed),
+    pub default_target_changed: qt_signal!(),
     pub apply_rules: qt_method!(fn(&mut self)),
     pub rate_rules: qt_property!(RefCell<MutListModel<RateLimitRule>>; CONST),
     pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
@@ -159,39 +204,8 @@ pub struct Backend {
 
 impl Backend {
     pub fn new() -> Self {
-        let rules = MutListModel::from_iter(vec![
-            QRule {
-                device: 1,
-                proto: 1,
-                exe: "".to_string().into(),
-                port_begin: 0,
-                port_end: 0,
-                addr: "8.8.8.8".to_string().into(),
-                ..Default::default()
-            },
-            QRule {
-                device: 1,
-                proto: 1,
-                exe: "".to_string().into(),
-                port_begin: 0,
-                port_end: 0,
-                addr: "8.8.8.8".to_string().into(),
-                ..Default::default()
-            },
-            QRule {
-                device: 1,
-                proto: 1,
-                exe: "".to_string().into(),
-                port_begin: 0,
-                port_end: 0,
-                addr: "8.8.8.8".to_string().into(),
-                ..Default::default()
-            },
-        ]);
-        let targets = QVariantList::from_iter(vec![
-            QString::from("Rate Limit Rule 1".to_string()),
-            QString::from("Rate Limit Rule 2".to_string()),
-        ]);
+        let rules = MutListModel::default();
+        let targets = QVariantList::default();
         let default_target = 0;
 
         let runtime = Runtime::new().unwrap();
@@ -207,6 +221,7 @@ impl Backend {
             targets: targets,
             targets_changed: Default::default(),
             default_target,
+            default_target_changed: Default::default(),
             apply_rules: Default::default(),
             rate_rules: RefCell::new(rate_rules),
             daemon_connected: false,
@@ -260,6 +275,8 @@ impl Backend {
             rate_rules,
             default_target,
         };
+
+        dbg!(&rules);
 
         self.runtime
             .block_on(Compat::new(
@@ -315,9 +332,19 @@ impl Backend {
                     })
                     .expect("QObject doesn't exist");
             });
+            let ptr = QPointer::from(&*self);
+            let on_rules_updated_callback = queued_callback(move |rules| {
+                ptr.as_ref()
+                    .map(|p| {
+                        let mutp = unsafe { &mut *(p as *const _ as *mut implementation::Backend) };
+                        mutp.on_rules_updated(rules);
+                    })
+                    .expect("QObject doesn't exist");
+            });
 
             thread::spawn(|| {
-                monitor::run(on_packages_callback).expect("Failed to start monitor");
+                monitor::run(on_packages_callback, on_rules_updated_callback)
+                    .expect("Failed to start monitor");
             });
             while !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {}
         }
@@ -400,6 +427,24 @@ impl Backend {
                 .or_insert_with(|| ProgramStatus::new(&log.exe));
             *status += log;
         }
+    }
+    pub fn on_rules_updated(&mut self, rules: Rules) {
+        let new_rules = rules.rules.iter().map(|rule| rule.into()).collect();
+        self.rules.borrow_mut().reset_data(new_rules);
+        self.default_target = match rules.default_target {
+            RuleTarget::Accept => 0,
+            RuleTarget::Drop => 1,
+            RuleTarget::RateLimit(n) => n + 2,
+        };
+        self.targets = QVariantList::from_iter(
+            rules
+                .rate_rules
+                .iter()
+                .map(|rate_rule| rate_rule.name.as_str())
+                .map(QString::from),
+        );
+        self.default_target_changed();
+        self.targets_changed();
     }
 }
 
