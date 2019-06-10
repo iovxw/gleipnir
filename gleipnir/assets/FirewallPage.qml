@@ -282,7 +282,6 @@ Pane {
             id: rulesTable
             Layout.fillHeight: true
             Layout.fillWidth: true
-            clip: true
             model: visualModel
             footer: Pane {
                 width: parent.width
