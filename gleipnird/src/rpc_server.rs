@@ -144,7 +144,7 @@ pub fn run(
     rules_setter: AbSetter<IndexedRules>,
     pkt_logs: crossbeam_channel::Receiver<PackageReport>,
 ) -> Result<(), std::io::Error> {
-    let addr = std::path::PathBuf::from("/tmp/gleipnird");
+    let addr = std::path::PathBuf::from("/var/run/gleipnird");
     if addr.exists() {
         if UnixStream::connect(&addr).is_ok() {
             return Err(std::io::ErrorKind::AddrInUse.into());

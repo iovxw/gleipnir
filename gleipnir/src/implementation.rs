@@ -350,7 +350,7 @@ impl Backend {
         }
         let client: Result<daemon::Client, io::Error> = self.runtime.block_on(Compat::new(
             async {
-                let transport = unixtransport::connect("/tmp/gleipnird").await?;
+                let transport = unixtransport::connect("/var/run/gleipnird").await?;
                 let mut client =
                     daemon::new_stub(tarpc::client::Config::default(), transport).await?;
                 client
