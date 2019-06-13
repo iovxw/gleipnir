@@ -301,7 +301,7 @@ mod test {
 
         let r = IndexedRules::new(RuleTarget::Drop, raw_rules.clone(), vec![]);
         assert_eq!(r.device, device);
-        assert_eq!(r.any_device, vec![]);
+        assert_eq!(r.any_device, Vec::<usize>::new());
         assert_eq!(r.proto, proto);
         assert_eq!(r.any_proto, vec![0, 3, 4]);
         assert_eq!(r.exe, exe);
