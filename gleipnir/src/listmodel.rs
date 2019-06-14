@@ -55,12 +55,13 @@ impl<T: MutListItem> MutListModel<T> {
         (self as &mut QAbstractListModel).end_remove_rows();
         return item;
     }
-    pub fn swap(&mut self, a: usize, b: usize) {
+    pub fn swap(&mut self, mut a: usize, mut b: usize) {
+        if a < b {
+            std::mem::swap(&mut a, &mut b);
+        }
+        (self as &mut QAbstractListModel).begin_move_rows(a as i32, a as i32, b as i32);
         self.values.swap(a, b);
-        let idx = (self as &mut QAbstractListModel).row_index(a as i32);
-        (self as &mut QAbstractListModel).data_changed(idx, idx);
-        let idx = (self as &mut QAbstractListModel).row_index(b as i32);
-        (self as &mut QAbstractListModel).data_changed(idx, idx);
+        (self as &mut QAbstractListModel).end_move_rows();
     }
     pub fn change_line(&mut self, index: usize, value: T) {
         self.values[index] = value;
@@ -68,13 +69,9 @@ impl<T: MutListItem> MutListModel<T> {
         (self as &mut QAbstractListModel).data_changed(idx, idx);
     }
     pub fn reset_data(&mut self, data: Vec<T>) {
-        dbg!(0);
         (self as &mut QAbstractListModel).begin_reset_model();
-        dbg!(1);
         self.values = data;
-        dbg!(2);
         (self as &mut QAbstractListModel).end_reset_model();
-        dbg!(3);
     }
 }
 

@@ -367,7 +367,7 @@ impl Backend {
         Ok(())
     }
     pub fn daemon_exists(&self) -> bool {
-        let addr = std::path::PathBuf::from("/tmp/gleipnird");
+        let addr = std::path::PathBuf::from("/var/run/gleipnird");
         addr.exists() && UnixStream::connect(&addr).is_ok()
     }
     pub fn refresh_monitor(&mut self) {
