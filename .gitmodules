@@ -1,3 +1,6 @@
 [submodule "nfqueue-rs"]
 	path = gleipnird/nfqueue-rs
 	url = https://github.com/iovxw/nfqueue-rs.git
+[submodule "gleipnir/qmetaobject-rs"]
+	path = gleipnir/qmetaobject-rs
+	url = https://github.com/iovxw/qmetaobject-rs.git
