@@ -182,7 +182,7 @@ pub struct Backend {
     pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
     pub daemon_connected_changed: qt_signal!(),
     pub new_rule: qt_method!(fn(&mut self)),
-    pub swap_rule: qt_method!(fn(&mut self, a: usize, b: usize)),
+    pub move_rule: qt_method!(fn(&mut self, src: usize, dst: usize)),
     pub remove_rule: qt_method!(fn(&mut self, i: usize)),
     pub start_daemon: qt_method!(fn(&mut self)),
     pub start_daemon_error: qt_signal!(e: QString),
@@ -227,7 +227,7 @@ impl Backend {
             daemon_connected: false,
             daemon_connected_changed: Default::default(),
             new_rule: Default::default(),
-            swap_rule: Default::default(),
+            move_rule: Default::default(),
             remove_rule: Default::default(),
             start_daemon: Default::default(),
             start_daemon_error: Default::default(),
@@ -292,8 +292,8 @@ impl Backend {
     pub fn new_rule(&mut self) {
         self.rules.borrow_mut().push(QRule::default());
     }
-    pub fn swap_rule(&mut self, a: usize, b: usize) {
-        self.rules.borrow_mut().swap(a, b);
+    pub fn move_rule(&mut self, src: usize, dst: usize) {
+        self.rules.borrow_mut().r#move(src, dst);
     }
     pub fn remove_rule(&mut self, i: usize) {
         self.rules.borrow_mut().remove(i);

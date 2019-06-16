@@ -55,12 +55,11 @@ impl<T: MutListItem> MutListModel<T> {
         (self as &mut QAbstractListModel).end_remove_rows();
         return item;
     }
-    pub fn swap(&mut self, mut a: usize, mut b: usize) {
-        if a < b {
-            std::mem::swap(&mut a, &mut b);
-        }
-        (self as &mut QAbstractListModel).begin_move_rows(a as i32, a as i32, b as i32);
-        self.values.swap(a, b);
+    pub fn r#move(&mut self, mut src: usize, mut dst: usize) {
+        (self as &mut QAbstractListModel).begin_move_rows(src as i32, src as i32, dst as i32);
+        let dst = if src < dst { dst - 1 } else { dst };
+        let item = self.values.remove(src);
+        self.values.insert(dst, item);
         (self as &mut QAbstractListModel).end_move_rows();
     }
     pub fn change_line(&mut self, index: usize, value: T) {

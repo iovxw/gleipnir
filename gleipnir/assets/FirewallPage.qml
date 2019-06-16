@@ -121,7 +121,7 @@ Pane {
                         visualModel.dragSrc = ruleRow.DelegateModel.itemsIndex
                     } else {
                         // drag finished, update inner model
-                        backend.swap_rule(visualModel.dragSrc, visualModel.dragDst)
+                        backend.move_rule(visualModel.dragSrc, visualModel.dragDst)
                     }
                 }
             }
