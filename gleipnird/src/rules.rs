@@ -1,11 +1,8 @@
 use std::cell::RefCell;
-use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::ops::RangeInclusive;
 use std::time::{Duration, Instant};
 
 use lru_time_cache::LruCache;

@@ -11,12 +11,12 @@ use crossbeam_channel;
 use futures::{
     compat::{Compat, Executor01CompatExt, Future01CompatExt},
     executor::block_on,
-    future::{self, poll_fn, Ready},
+    future::poll_fn,
     prelude::*,
     FutureExt,
 };
 use futures_locks::Mutex;
-use gleipnir_interface::{daemon, monitor, unixtransport, PackageReport, Rule, RuleTarget, Rules};
+use gleipnir_interface::{daemon, monitor, unixtransport, PackageReport, Rules};
 use rpc::context;
 use rpc::server::Server;
 use slab::Slab;

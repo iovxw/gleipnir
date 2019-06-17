@@ -355,7 +355,7 @@ impl Backend {
                     daemon::new_stub(tarpc::client::Config::default(), transport).await?;
                 client
                     .init_monitor(tarpc::context::current(), "/tmp/gleipnir".to_string())
-                    .await;
+                    .await?;
                 Ok(client)
             }
                 .boxed(),

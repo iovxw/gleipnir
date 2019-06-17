@@ -1,20 +1,15 @@
+use std::io;
+use std::marker::PhantomData;
+use std::net::SocketAddr;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
-use std::{
-    error::Error,
-    io,
-    marker::PhantomData,
-    net::SocketAddr,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use async_bincode::{AsyncBincodeStream, AsyncDestination};
 use futures::{compat::*, prelude::*, ready};
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 use pin_utils::unsafe_pinned;
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{UnixListener, UnixStream};
 
 pub struct UnixTransport<Item, SinkItem> {

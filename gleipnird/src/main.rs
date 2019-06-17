@@ -13,7 +13,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::thread;
 
 use crossbeam_channel;
-use gleipnir_interface::{Device, PackageReport, Proto, Rule, RuleTarget};
+use gleipnir_interface::{Device, PackageReport, Proto};
 use libc;
 use lru_time_cache::LruCache;
 use nfqueue;
