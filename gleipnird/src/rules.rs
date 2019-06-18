@@ -233,6 +233,7 @@ impl From<Rules> for IndexedRules {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::ops::RangeInclusive;
 
     #[test]
     fn rules_indexing() {
