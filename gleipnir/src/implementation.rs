@@ -26,7 +26,7 @@ use crate::implementation;
 use crate::listmodel::{MutListItem, MutListModel};
 use crate::monitor;
 
-#[derive(QGadget, SimpleListItem, Default)]
+#[derive(QGadget, SimpleListItem, Default, Debug)]
 pub struct QRule {
     pub device: qt_property!(usize),
     pub proto: qt_property!(usize),

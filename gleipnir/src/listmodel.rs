@@ -56,8 +56,11 @@ impl<T: MutListItem> MutListModel<T> {
         return item;
     }
     pub fn r#move(&mut self, src: usize, dst: usize) {
-        (self as &mut dyn QAbstractListModel).begin_move_rows(src as i32, src as i32, dst as i32);
-        let dst = if src < dst { dst - 1 } else { dst };
+        if src == dst {
+            return;
+        }
+        let qdst = if src < dst { dst + 1 } else { dst };
+        (self as &mut dyn QAbstractListModel).begin_move_rows(src as i32, src as i32, qdst as i32);
         let item = self.values.remove(src);
         self.values.insert(dst, item);
         (self as &mut dyn QAbstractListModel).end_move_rows();
