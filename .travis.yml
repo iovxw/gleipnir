@@ -17,3 +17,6 @@ addons:
       - qt512tools
 install:
   - source /opt/qt512/bin/qt512-env.sh
+script:
+  - cargo build --verbose --all
+  - cargo test --verbose --all --exclude qmetaobject
