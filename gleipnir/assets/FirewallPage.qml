@@ -304,36 +304,42 @@ Pane {
         }
     }
 
-    Pane {
+    RateLimitRulesPopup {
+        id: rateLimitRules
+    }
+
+    RowLayout {
         id: tableFooter
         anchors.bottom: parent.bottom
         width: parent.width
-        padding: 0
         implicitHeight: applyBtn.height
-        RowLayout {
-            anchors.verticalCenter: parent.verticalCenter
-            Label {
-                text: qsTr("Default Target: ")
+        Label {
+            text: qsTr("Default Target: ")
+        }
+        ComboBox {
+            id: defaultTarget
+            currentIndex: 0
+            onCurrentIndexChanged: backend.default_target = currentIndex
+            model: []
+            Component.onCompleted: {
+                updateModel()
+                backend.targets_changed.connect(updateModel)
+                currentIndex = backend.default_target
             }
-            ComboBox {
-                id: defaultTarget
-                currentIndex: 0
-                onCurrentIndexChanged: backend.default_target = currentIndex
-                model: []
-                Component.onCompleted: {
-                    updateModel()
-                    backend.targets_changed.connect(updateModel)
-                    currentIndex = backend.default_target
-                }
-                function updateModel() {
-                    let baseTargets = [qsTr("Accept"), qsTr("Drop")];
-                    model = baseTargets.concat(backend.targets)
-                }
+            function updateModel() {
+                let baseTargets = [qsTr("Accept"), qsTr("Drop")];
+                model = baseTargets.concat(backend.targets)
             }
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+        Button {
+            text: qsTr("Rate Limit Rules")
+            onClicked: rateLimitRules.open()
         }
         Button {
             id: applyBtn
-            anchors.right: parent.right
             text: qsTr("Apply")
             onClicked: if (backend.daemon_connected) {
                 backend.apply_rules()

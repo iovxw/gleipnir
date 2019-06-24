@@ -179,6 +179,8 @@ pub struct Backend {
     pub default_target_changed: qt_signal!(),
     pub apply_rules: qt_method!(fn(&mut self)),
     pub rate_rules: qt_property!(RefCell<MutListModel<RateLimitRule>>; CONST),
+    pub new_rate_rule: qt_method!(fn(&mut self)),
+    pub remove_rate_rule: qt_method!(fn(&mut self, i: usize)),
     pub daemon_connected: qt_property!(bool; NOTIFY daemon_connected_changed),
     pub daemon_connected_changed: qt_signal!(),
     pub new_rule: qt_method!(fn(&mut self)),
@@ -197,7 +199,7 @@ pub struct Backend {
     pub chart_x_size: qt_property!(usize),
     current_traffic: HashMap<String, ProgramStatus>,
     traffic_history: HashMap<String, Vec<u32>>,
-    prev_proc_on_chart: Vec<String>,
+    // prev_proc_on_chart: Vec<String>,
     runtime: Runtime,
     client: Option<daemon::Client>,
 }
@@ -224,6 +226,8 @@ impl Backend {
             default_target_changed: Default::default(),
             apply_rules: Default::default(),
             rate_rules: RefCell::new(rate_rules),
+            new_rate_rule: Default::default(),
+            remove_rate_rule: Default::default(),
             daemon_connected: false,
             daemon_connected_changed: Default::default(),
             new_rule: Default::default(),
@@ -242,7 +246,7 @@ impl Backend {
             chart_x_size: 80,
             current_traffic: Default::default(),
             traffic_history: Default::default(),
-            prev_proc_on_chart: vec![String::default(); 5],
+            // prev_proc_on_chart: vec![String::default(); 5],
             runtime,
             client: None,
         }
@@ -287,6 +291,13 @@ impl Backend {
                     .boxed(),
             ))
             .unwrap();
+    }
+
+    pub fn new_rate_rule(&mut self) {
+        self.rate_rules.borrow_mut().push(Default::default());
+    }
+    pub fn remove_rate_rule(&mut self, i: usize) {
+        self.rate_rules.borrow_mut().remove(i);
     }
 
     pub fn new_rule(&mut self) {
@@ -443,6 +454,7 @@ impl Backend {
                 .map(|rate_rule| rate_rule.name.as_str())
                 .map(QString::from),
         );
+        self.rate_rules.borrow_mut().reset_data(rules.rate_rules);
         self.default_target_changed();
         self.targets_changed();
     }

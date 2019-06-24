@@ -28,7 +28,7 @@ pub struct Rules {
     pub rate_rules: Vec<RateLimitRule>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct RateLimitRule {
     pub name: String,
     pub limit: usize,
