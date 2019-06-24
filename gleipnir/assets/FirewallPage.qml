@@ -53,7 +53,6 @@ Pane {
             id: firewallTitle3
             topPadding: 0
             bottomPadding: 0
-            implicitWidth: defaultFont.width * 15
             Label {
                 text: qsTr("Address")
                 font.bold: true
@@ -66,17 +65,6 @@ Pane {
             topPadding: 0
             bottomPadding: 0
             Label {
-                text: qsTr("Subnet Mask")
-                font.bold: true
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-        }
-        ToolSeparator {}
-        Pane {
-            id: firewallTitle5
-            topPadding: 0
-            bottomPadding: 0
-            Label {
                 text: qsTr("Port Range")
                 font.bold: true
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -84,7 +72,7 @@ Pane {
         }
         ToolSeparator {}
         Pane {
-            id: firewallTitle6
+            id: firewallTitle5
             topPadding: 0
             bottomPadding: 0
             Label {
@@ -185,28 +173,42 @@ Pane {
                     text: model.exe
                     onTextChanged: if (model.exe != text) model.exe = text
                 }
-                TextField {
+                Control {
                     x: firewallTitle3.x
-                    width: firewallTitle3.width
-                    selectByMouse: true
-                    text: model.addr
-                    onTextChanged: if (model.addr != text) model.addr = text
-                }
-                TextField {
-                    x: firewallTitle4.x + (firewallTitle4.width - width) / 2
-                    width: defaultFont.width * 4
-                    selectByMouse: true
-                    validator: IntValidator { bottom: 0; top: 128 /*model.isV4 ? 32 : 128;*/ }
-                    horizontalAlignment: TextInput.AlignHCenter
-                    text: model.mask
-                    onTextChanged: if (model.mask != parseInt(text)) model.mask = parseInt(text)
+                    implicitWidth: addrIp.width + addrSlash.width + addrSubnetMask.width
+                    implicitHeight: addrIp.height
+                    Component.onCompleted: firewallTitle3.implicitWidth = width
+
+                    TextField {
+                        id: addrIp
+                        width: defaultFont.width * 15
+                        selectByMouse: true
+                        text: model.addr
+                        onTextChanged: if (model.addr != text) model.addr = text
+                    }
+                    Label {
+                        id: addrSlash
+                        anchors.left: addrIp.right
+                        text: " / "
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    TextField {
+                        id: addrSubnetMask
+                        anchors.left: addrSlash.right
+                        width: defaultFont.width * 4
+                        selectByMouse: true
+                        validator: IntValidator { bottom: 0; top: 128 /*model.isV4 ? 32 : 128;*/ }
+                        horizontalAlignment: TextInput.AlignHCenter
+                        text: model.mask
+                        onTextChanged: if (model.mask != parseInt(text)) model.mask = parseInt(text)
+                    }
                 }
                 Control {
                     id: portRange
-                    x: firewallTitle5.x
+                    x: firewallTitle4.x
                     implicitWidth: portRangeBegin.width + portHyphen.width + portRangeEnd.width
                     implicitHeight: portRangeBegin.height
-                    Component.onCompleted: firewallTitle5.implicitWidth = width
+                    Component.onCompleted: firewallTitle4.implicitWidth = width
 
                     TextField {
                         id: portRangeBegin
@@ -235,11 +237,11 @@ Pane {
                     }
                 }
                 ComboBox {
-                    x: firewallTitle6.x
+                    x: firewallTitle5.x
                     currentIndex: target
                     onCurrentIndexChanged: if (target != currentIndex) target = currentIndex
                     model: defaultTarget.model
-                    Component.onCompleted: firewallTitle6.implicitWidth = width
+                    Component.onCompleted: firewallTitle5.implicitWidth = width
                 }
                 Rectangle {
                     id: removeBtn
