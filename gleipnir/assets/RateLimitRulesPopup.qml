@@ -92,6 +92,7 @@ Popup {
                 x: rateLimitRulesTitle2.x
                 text: "×"
                 width: height
+                highlighted: true
                 onClicked: backend.remove_rate_rule(index)
                 Component.onCompleted: rateLimitRulesTitle2.implicitWidth = width
             }
