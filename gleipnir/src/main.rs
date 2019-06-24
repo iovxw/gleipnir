@@ -45,6 +45,12 @@ fn main() {
     #[cfg(not(debug_assertions))]
     init_ressource();
 
+    unsafe {
+        cpp!([] {
+            QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+        })
+    }
+
     let mut engine = QmlEngine::new();
 
     let backend = implementation::Backend::new();
@@ -56,8 +62,6 @@ fn main() {
     let engine = &mut engine;
     unsafe {
         cpp!([engine as "QmlEngineHolder*"] {
-            QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-
             translator.load(QLocale::system(), "", "", ":/assets/i18n");
             QApplication::installTranslator(&translator);
 
