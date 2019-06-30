@@ -173,8 +173,6 @@ impl MutListItem for QRule {
 pub struct Backend {
     base: qt_base_class!(trait QObject),
     pub rules: qt_property!(RefCell<MutListModel<QRule>>; CONST),
-    pub targets: qt_property!(QVariantList; NOTIFY targets_changed),
-    pub targets_changed: qt_signal!(),
     pub default_target: qt_property!(usize; NOTIFY default_target_changed),
     pub default_target_changed: qt_signal!(),
     pub apply_rules: qt_method!(fn(&mut self)),
@@ -207,7 +205,6 @@ pub struct Backend {
 impl Backend {
     pub fn new() -> Self {
         let rules = MutListModel::default();
-        let targets = QVariantList::default();
         let default_target = 0;
 
         let runtime = Runtime::new().unwrap();
@@ -220,8 +217,6 @@ impl Backend {
         Backend {
             base: Default::default(),
             rules: RefCell::new(rules),
-            targets: targets,
-            targets_changed: Default::default(),
             default_target,
             default_target_changed: Default::default(),
             apply_rules: Default::default(),
@@ -447,16 +442,8 @@ impl Backend {
             RuleTarget::Drop => 1,
             RuleTarget::RateLimit(n) => n + 2,
         };
-        self.targets = QVariantList::from_iter(
-            rules
-                .rate_rules
-                .iter()
-                .map(|rate_rule| rate_rule.name.as_str())
-                .map(QString::from),
-        );
         self.rate_rules.borrow_mut().reset_data(rules.rate_rules);
         self.default_target_changed();
-        self.targets_changed();
     }
 }
 

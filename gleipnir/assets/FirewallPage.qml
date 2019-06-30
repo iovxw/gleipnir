@@ -241,6 +241,7 @@ Pane {
                     currentIndex: target
                     onCurrentIndexChanged: if (target != currentIndex) target = currentIndex
                     model: defaultTarget.model
+                    textRole: "name"
                     Component.onCompleted: firewallTitle5.implicitWidth = width
                 }
                 Rectangle {
@@ -318,17 +319,43 @@ Pane {
         }
         ComboBox {
             id: defaultTarget
-            currentIndex: 0
-            onCurrentIndexChanged: backend.default_target = currentIndex
-            model: []
-            Component.onCompleted: {
-                updateModel()
-                backend.targets_changed.connect(updateModel)
-                currentIndex = backend.default_target
+            currentIndex: backend.default_target
+            onCurrentIndexChanged: if (backend.default_target != currentIndex) backend.default_target = currentIndex
+            model: ListModel {
+                ListElement {
+                    name: qsTr("Accept")
+                }
+                ListElement {
+                    name: qsTr("Drop")
+                }
             }
-            function updateModel() {
-                let baseTargets = [qsTr("Accept"), qsTr("Drop")];
-                model = baseTargets.concat(backend.targets)
+            textRole: "name"
+            Component.onCompleted: {
+                currentIndex = backend.default_target
+
+                backend.rate_rules.modelReset.connect(() => {
+                    const count = backend.rate_rules.rowCount()
+                    for (var i = 0; i < count; i++) {
+                        const index = backend.rate_rules.index(i, 0)
+                        const name = backend.rate_rules.data(index, Qt.UserRole)
+                        model.append({"name": name.toString()})
+                    }
+                })
+                backend.rate_rules.dataChanged.connect((topLeft, bottomRight, roles) => {
+                    console.assert(topLeft == bottomRight)
+                    const name = backend.rate_rules.data(topLeft, Qt.UserRole)
+                    model.setProperty(2 + topLeft.row, "name", name.toString())
+                })
+                backend.rate_rules.rowsRemoved.connect((_, first, last) => {
+                    console.assert(first == last)
+                    model.remove(first.row)
+                })
+                backend.rate_rules.rowsInserted.connect((_, first, last) => {
+                    console.assert(first, last, model.count - 1)
+                    const index = backend.rate_rules.index(first, 0);
+                    const name = backend.rate_rules.data(index, Qt.UserRole)
+                    model.append({"name": name.toString()})
+                })
             }
         }
         Item {
