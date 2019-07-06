@@ -114,17 +114,21 @@ impl IndexedRules {
                 r.any_port.push(index);
             }
             match rule.subnet {
-                (IpAddr::V4(subnet), mask) => {
+                Some((IpAddr::V4(subnet), mask)) => {
                     v4_hashmap
                         .entry((subnet.mask(mask), mask))
                         .or_default()
                         .push(index);
                 }
-                (IpAddr::V6(subnet), mask) => {
+                Some((IpAddr::V6(subnet), mask)) => {
                     v6_hashmap
                         .entry((subnet.mask(mask), mask))
                         .or_default()
                         .push(index);
+                }
+                None => {
+                    r.any_v4.push(index);
+                    r.any_v6.push(index);
                 }
             }
         }

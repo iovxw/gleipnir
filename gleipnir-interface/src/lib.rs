@@ -101,7 +101,7 @@ pub struct Rule {
     pub exe: Option<String>,
     #[serde(with = "rangeinclusive_serde")]
     pub port: Option<RangeInclusive<u16>>,
-    pub subnet: (IpAddr, u8), // mask
+    pub subnet: Option<(IpAddr, u8)>, // mask
     pub target: RuleTarget,
 }
 
@@ -117,12 +117,13 @@ impl Rule {
             && (self.proto.is_none() || protocol == self.proto.unwrap())
             && (self.exe.is_none() || exe == self.exe.as_ref().unwrap())
             && (self.port.is_none() || self.port.as_ref().unwrap().contains(&addr.port()))
-            && addr.is_ipv4() == self.subnet.0.is_ipv4()
-            && (match (addr.ip(), self.subnet) {
-                (IpAddr::V4(addr), (IpAddr::V4(subnet), mask)) => addr.mask(mask) == subnet,
-                (IpAddr::V6(addr), (IpAddr::V6(subnet), mask)) => addr.mask(mask) == subnet,
-                _ => unreachable!(),
-            })
+            && (self.subnet.is_none()
+                || (addr.is_ipv4() == self.subnet.unwrap().0.is_ipv4()
+                    && (match (addr.ip(), self.subnet.unwrap()) {
+                        (IpAddr::V4(addr), (IpAddr::V4(subnet), mask)) => addr.mask(mask) == subnet,
+                        (IpAddr::V6(addr), (IpAddr::V6(subnet), mask)) => addr.mask(mask) == subnet,
+                        _ => unreachable!(),
+                    })))
         {
             Some(self.target)
         } else {

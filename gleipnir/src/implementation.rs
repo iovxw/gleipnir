@@ -62,8 +62,10 @@ impl From<&Rule> for QRule {
             .clone()
             .map(RangeInclusive::into_inner)
             .unwrap_or_default();
-        let addr = rule.subnet.0.to_string().into();
-        let mask = rule.subnet.1;
+        let (addr, mask) = rule
+            .subnet
+            .map(|subnet| (subnet.0.to_string().into(), subnet.1))
+            .unwrap_or_default();
         let target = match rule.target {
             RuleTarget::Accept => 0,
             RuleTarget::Drop => 1,
@@ -107,10 +109,15 @@ impl From<&QRule> for Rule {
             (port, 0) => Some(RangeInclusive::new(port, port)),
             (port_begin, port_end) => Some(RangeInclusive::new(port_begin, port_end)),
         };
-        let addr = String::from_utf16_lossy(qrule.addr.to_slice())
-            .parse()
-            .expect("Failed to parse IpAddr");
-        let subnet = (addr, qrule.mask);
+        let qaddr = qrule.addr.to_slice();
+        let subnet = if qaddr.is_empty() {
+            None
+        } else {
+            let addr = String::from_utf16_lossy(qaddr)
+                .parse()
+                .expect("Failed to parse IpAddr");
+            Some((addr, qrule.mask))
+        };
         let target = match qrule.target {
             0 => RuleTarget::Accept,
             1 => RuleTarget::Drop,
