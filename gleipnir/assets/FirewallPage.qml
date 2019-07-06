@@ -1,6 +1,7 @@
 import QtQuick 2.8
 import QtQuick.Layouts 1.3
 import QtQuick.Controls 2.3
+import QtQuick.Dialogs 1.3
 import QtQml.Models 2.1
 
 Pane {
@@ -200,11 +201,30 @@ Pane {
                     model: [qsTr("Any"), "TCP", "UDP", "UDPLite"]
                     Component.onCompleted: firewallTitle1.implicitWidth = width
                 }
-                TextField {
+                RowLayout {
                     x: firewallTitle2.x
                     width: firewallTitle2.width
-                    text: model.exe
-                    onTextChanged: if (model.exe != text) model.exe = text
+                    TextField {
+                        Layout.fillWidth: true
+                        text: model.exe
+                        onTextChanged: if (model.exe != text) model.exe = text
+                        selectByMouse: true
+                    }
+                    RoundButton {
+                        text: "..."
+                        onClicked: fileDialog.open()
+                    }
+                    FileDialog {
+                        id: fileDialog
+                        title: qsTr("Please choose a program")
+                        folder: "/usr/bin"
+                        onAccepted: {
+                            let path = fileDialog.fileUrl.toString()
+                            path = path.replace(/^(file:\/{2})/,"")
+                            path = decodeURIComponent(path)
+                            model.exe = path
+                        }
+                    }
                 }
                 Control {
                     x: firewallTitle3.x
