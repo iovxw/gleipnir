@@ -6,6 +6,39 @@ import QtQml.Models 2.1
 Pane {
     id: root
 
+    function parseIntDefault(string) {
+        const n = parseInt(string)
+        return n ? n : 0
+    }
+    function parsePort(string) {
+        const port = parseIntDefault(string);
+        return port > 25565 ? 25565 : port;
+    }
+
+    function isIP(s) {
+        // IPv4 Segment
+        const v4Seg = '(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])';
+        const v4Str = `(${v4Seg}[.]){3}${v4Seg}`;
+        const IPv4Reg = new RegExp(`^${v4Str}$`);
+
+        // IPv6 Segment
+        const v6Seg = '(?:[0-9a-fA-F]{1,4})';
+        const IPv6Reg = new RegExp('^(' +
+                                   `(?:${v6Seg}:){7}(?:${v6Seg}|:)|` +
+                                   `(?:${v6Seg}:){6}(?:${v4Str}|:${v6Seg}|:)|` +
+                                   `(?:${v6Seg}:){5}(?::${v4Str}|(:${v6Seg}){1,2}|:)|` +
+                                   `(?:${v6Seg}:){4}(?:(:${v6Seg}){0,1}:${v4Str}|(:${v6Seg}){1,3}|:)|` +
+                                   `(?:${v6Seg}:){3}(?:(:${v6Seg}){0,2}:${v4Str}|(:${v6Seg}){1,4}|:)|` +
+                                   `(?:${v6Seg}:){2}(?:(:${v6Seg}){0,3}:${v4Str}|(:${v6Seg}){1,5}|:)|` +
+                                   `(?:${v6Seg}:){1}(?:(:${v6Seg}){0,4}:${v4Str}|(:${v6Seg}){1,6}|:)|` +
+                                   `(?::((?::${v6Seg}){0,5}:${v4Str}|(?::${v6Seg}){1,7}|:))` +
+                                   ')(%[0-9a-zA-Z]{1,})?$');
+
+        if (IPv4Reg.test(s)) return 4;
+        if (IPv6Reg.test(s)) return 6;
+        return 0;
+    }
+
     RowLayout {
         id: tableHeader
         Layout.fillWidth: true
@@ -179,12 +212,31 @@ Pane {
                     implicitHeight: addrIp.height
                     Component.onCompleted: firewallTitle3.implicitWidth = width
 
+                    function fixMaskLength() {
+                        const max = addrIp.valid == 4 ? 32 : 128;
+                        const mask = parseInt(addrSubnetMask.text);
+                        if (mask > max) {
+                            model.mask = max;
+                        } else if (model.mask != mask) {
+                            model.mask = mask
+                        }
+                    }
+
                     TextField {
+                        property int valid: 4
                         id: addrIp
                         width: defaultFont.width * 15
                         selectByMouse: true
                         text: model.addr
-                        onTextChanged: if (model.addr != text) model.addr = text
+                        color: valid ? palette.text : "white"
+                        onValidChanged: {
+                            background.color = valid ? palette.base : "red";
+                            parent.fixMaskLength();
+                        }
+                        onTextChanged: {
+                            if (model.addr != text) model.addr = text;
+                            valid = isIP(text) || text.length == 0;
+                        }
                     }
                     Label {
                         id: addrSlash
@@ -197,10 +249,10 @@ Pane {
                         anchors.left: addrSlash.right
                         width: defaultFont.width * 4
                         selectByMouse: true
-                        validator: IntValidator { bottom: 0; top: 128 /*model.isV4 ? 32 : 128;*/ }
+                        validator: RegExpValidator { regExp: /[0-9]{0,3}/ }
                         horizontalAlignment: TextInput.AlignHCenter
                         text: model.mask
-                        onTextChanged: if (model.mask != parseInt(text)) model.mask = parseInt(text)
+                        onTextChanged: parent.fixMaskLength()
                     }
                 }
                 Control {
@@ -210,14 +262,29 @@ Pane {
                     implicitHeight: portRangeBegin.height
                     Component.onCompleted: firewallTitle4.implicitWidth = width
 
+                    function fixPortRange() {
+                        if ((!model.portBegin && model.portEnd) || model.portBegin == model.portEnd) {
+                            model.portBegin = model.portEnd;
+                            model.portEnd = 0;
+                        }
+                    }
+
                     TextField {
                         id: portRangeBegin
                         width: font.pointSize * 5
-                        validator: IntValidator{bottom: 1; top: 65535;}
+                        validator: RegExpValidator { regExp: /[0-9]{0,5}/ }
                         selectByMouse: true
                         horizontalAlignment: TextInput.AlignHCenter
-                        text: model.portBegin
-                        onTextChanged: if (model.portBegin != parseInt(text)) model.portBegin = parseInt(text)
+                        text: model.portBegin ? model.portBegin : ""
+                        onTextChanged: {
+                            let portB = parsePort(portRangeBegin.text);
+                            let portE = parsePort(portRangeEnd.text);
+                            if (model.portBegin != portB)
+                                model.portBegin = portB
+
+                            portRangeEnd.valid = !portE || portE >= portB;
+                        }
+                        onEditingFinished: parent.fixPortRange()
                     }
                     Label {
                         id: portHyphen
@@ -226,14 +293,25 @@ Pane {
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     TextField {
+                        property bool valid: true
                         id: portRangeEnd
                         anchors.left: portHyphen.right
                         width: font.pointSize * 5
-                        validator: IntValidator{bottom: 1; top: 65535;}
+                        validator: RegExpValidator { regExp: /[0-9]{0,5}/ }
                         selectByMouse: true
                         horizontalAlignment: TextInput.AlignHCenter
-                        text: model.portEnd
-                        onTextChanged: if (model.portEnd != parseInt(text)) model.portEnd = parseInt(text)
+                        text: model.portEnd ? model.portEnd : ""
+                        color: valid ? palette.text : "white"
+                        onValidChanged: background.color = valid ? palette.base : "red"
+                        onTextChanged: {
+                            let portB = parsePort(portRangeBegin.text);
+                            let portE = parsePort(portRangeEnd.text);
+                            if (model.portEnd != portE)
+                                model.portEnd = portE
+
+                            valid = !portE || portE >= portB;
+                        }
+                        onEditingFinished: parent.fixPortRange()
                     }
                 }
                 ComboBox {
