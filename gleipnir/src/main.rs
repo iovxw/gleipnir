@@ -65,6 +65,10 @@ fn main() {
             translator.load(QLocale::system(), "", "", ":/assets/i18n");
             QApplication::installTranslator(&translator);
 
+            engine->app->setOrganizationName("iovxw");
+            engine->app->setOrganizationDomain("iovxw.net");
+            engine->app->setApplicationName("Gleipnir");
+
             //auto icon = QIcon::fromTheme("x", QIcon(":/assets/x.svg"));
             //engine->app->setWindowIcon(icon);
         });
