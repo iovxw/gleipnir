@@ -8,9 +8,9 @@ edition = "2018"
 libc = "0.2"
 treebitmap = "0.3"
 nix = "0.13"
-tarpc = { version = "0.18",  features = ["serde1"] }
-rpc = { package = "tarpc-lib", version = "0.6" }
-bincode-transport = { package = "tarpc-bincode-transport", version = "0.7" }
+rpc = { package = "tarpc-lib", version = "0.6", git = "https://github.com/iovxw/tarpc.git", branch = "update-futures" }
+tarpc = { version = "0.18",  features = ["serde1"], git = "https://github.com/iovxw/tarpc.git", branch = "update-futures" }
+bincode-transport = { package = "tarpc-bincode-transport", version = "0.7", git = "https://github.com/iovxw/tarpc.git", branch = "update-futures" }
 futures-preview = { version = "0.3.0-alpha.16", features = ["compat"] }
 tokio = "0.1"
 async-bincode = "0.4"
