@@ -247,7 +247,7 @@ mod test {
                 proto: None,
                 exe: None,
                 port: None,
-                subnet: ([1, 1, 1, 1].into(), 32),
+                subnet: Some(([1, 1, 1, 1].into(), 32)),
                 target: RuleTarget::Accept,
             },
             Rule {
@@ -255,7 +255,7 @@ mod test {
                 proto: Some(Proto::Tcp),
                 exe: None,
                 port: None,
-                subnet: ([1, 1, 1, 1].into(), 32),
+                subnet: Some(([1, 1, 1, 1].into(), 32)),
                 target: RuleTarget::Accept,
             },
             Rule {
@@ -263,7 +263,7 @@ mod test {
                 proto: Some(Proto::Tcp),
                 exe: None,
                 port: None,
-                subnet: ([2, 2, 2, 2].into(), 30),
+                subnet: Some(([2, 2, 2, 2].into(), 30)),
                 target: RuleTarget::Accept,
             },
             Rule {
@@ -271,7 +271,7 @@ mod test {
                 proto: None,
                 exe: Some("".into()),
                 port: Some(RangeInclusive::new(10, 200)),
-                subnet: ([2, 2, 2, 2].into(), 32),
+                subnet: Some(([2, 2, 2, 2].into(), 32)),
                 target: RuleTarget::Accept,
             },
             Rule {
@@ -279,7 +279,7 @@ mod test {
                 proto: None,
                 exe: Some("".into()),
                 port: Some(RangeInclusive::new(100, 100)),
-                subnet: ([0, 0, 0, 0].into(), 0),
+                subnet: Some(([0, 0, 0, 0].into(), 0)),
                 target: RuleTarget::Accept,
             },
         ];
