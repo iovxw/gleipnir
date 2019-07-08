@@ -48,7 +48,7 @@ impl<Item, SinkItem> Sink<SinkItem> for UnixTransport<Item, SinkItem>
 where
     SinkItem: Serialize,
 {
-    type SinkError = io::Error;
+    type Error = io::Error;
 
     fn start_send(self: Pin<&mut Self>, item: SinkItem) -> io::Result<()> {
         self.inner().start_send(item)
