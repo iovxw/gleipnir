@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::env;
 use std::io;
 use std::iter::FromIterator;
 use std::mem;
+use std::net::AddrParseError;
 use std::ops::AddAssign;
 use std::ops::RangeInclusive;
 use std::os::unix::net::UnixStream;
@@ -11,6 +13,7 @@ use std::process::Command;
 use std::sync::atomic::Ordering;
 use std::thread;
 
+use failure::{self, Fail};
 use futures::{
     compat::{Compat, Executor01CompatExt},
     future::FutureExt,
@@ -84,8 +87,23 @@ impl From<&Rule> for QRule {
     }
 }
 
-impl From<&QRule> for Rule {
-    fn from(qrule: &QRule) -> Self {
+#[derive(Fail, Debug)]
+pub enum InvalidQRule {
+    #[fail(display = "Invalid port range: {}-{}", begin, end)]
+    PortRange { begin: u16, end: u16 },
+    #[fail(display = "Invalid address: {}", _0)]
+    Address(AddrParseError),
+}
+
+impl From<AddrParseError> for InvalidQRule {
+    fn from(e: AddrParseError) -> Self {
+        InvalidQRule::Address(e)
+    }
+}
+
+impl TryFrom<&QRule> for Rule {
+    type Error = InvalidQRule;
+    fn try_from(qrule: &QRule) -> Result<Self, Self::Error> {
         let device = match qrule.device {
             0 => None,
             1 => Some(Device::Input),
@@ -107,15 +125,16 @@ impl From<&QRule> for Rule {
         let port = match (qrule.port_begin, qrule.port_end) {
             (0, 0) => None,
             (port, 0) => Some(RangeInclusive::new(port, port)),
+            (begin, end) if begin > end => {
+                return Err(InvalidQRule::PortRange { begin, end });
+            }
             (port_begin, port_end) => Some(RangeInclusive::new(port_begin, port_end)),
         };
         let qaddr = qrule.addr.to_slice();
         let subnet = if qaddr.is_empty() {
             None
         } else {
-            let addr = String::from_utf16_lossy(qaddr)
-                .parse()
-                .expect("Failed to parse IpAddr");
+            let addr = String::from_utf16_lossy(qaddr).parse()?;
             Some((addr, qrule.mask))
         };
         let target = match qrule.target {
@@ -123,14 +142,14 @@ impl From<&QRule> for Rule {
             1 => RuleTarget::Drop,
             n => RuleTarget::RateLimit(n - 2),
         };
-        Self {
+        Ok(Self {
             device,
             proto,
             exe,
             port,
             subnet,
             target,
-        }
+        })
     }
 }
 
@@ -183,6 +202,7 @@ pub struct Backend {
     pub default_target: qt_property!(usize; NOTIFY default_target_changed),
     pub default_target_changed: qt_signal!(),
     pub apply_rules: qt_method!(fn(&mut self)),
+    pub apply_rules_error: qt_signal!(error: QString),
     pub rate_rules: qt_property!(RefCell<MutListModel<RateLimitRule>>; CONST),
     pub new_rate_rule: qt_method!(fn(&mut self)),
     pub remove_rate_rule: qt_method!(fn(&mut self, i: usize)),
@@ -227,6 +247,7 @@ impl Backend {
             default_target,
             default_target_changed: Default::default(),
             apply_rules: Default::default(),
+            apply_rules_error: Default::default(),
             rate_rules: RefCell::new(rate_rules),
             new_rate_rule: Default::default(),
             remove_rate_rule: Default::default(),
@@ -255,19 +276,15 @@ impl Backend {
     }
 
     pub fn apply_rules(&mut self) {
-        let authed = self
-            .runtime
-            .block_on(Compat::new(
-                self.client
-                    .as_mut()
-                    .expect("")
-                    .unlock(tarpc::context::current())
-                    .boxed(),
-            ))
-            .unwrap();
-        dbg!(authed);
-
-        let rules: Vec<Rule> = self.rules.borrow().iter().map(Into::into).collect();
+        let rules: Result<Vec<Rule>, _> =
+            self.rules.borrow().iter().map(TryInto::try_into).collect();
+        let rules = match rules {
+            Ok(r) => r,
+            Err(e) => {
+                self.apply_rules_error(e.to_string().into());
+                return;
+            }
+        };
         let rate_rules = (&**self.rate_rules.borrow()).to_vec();
 
         let default_target = match self.default_target {
@@ -283,6 +300,18 @@ impl Backend {
         };
 
         dbg!(&rules);
+
+        let authed = self
+            .runtime
+            .block_on(Compat::new(
+                self.client
+                    .as_mut()
+                    .expect("")
+                    .unlock(tarpc::context::current())
+                    .boxed(),
+            ))
+            .unwrap();
+        dbg!(authed);
 
         self.runtime
             .block_on(Compat::new(

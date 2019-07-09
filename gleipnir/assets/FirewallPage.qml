@@ -473,6 +473,13 @@ Pane {
             } else {
                 startDaemonPopup.open()
             }
+            Component.onCompleted: {
+                backend.apply_rules_error.connect((err) => {
+                    errorPopup.message = qsTr("Illegal rules:")
+                    errorPopup.error = err
+                    errorPopup.open()
+                })
+            }
         }
     }
 }
