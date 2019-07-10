@@ -92,7 +92,7 @@ pub enum InvalidQRule {
     #[fail(display = "Invalid port range: {}-{}", begin, end)]
     PortRange { begin: u16, end: u16 },
     #[fail(display = "Invalid address: {}", _0)]
-    Address(AddrParseError),
+    Address(#[fail(cause)] AddrParseError),
 }
 
 impl From<AddrParseError> for InvalidQRule {
