@@ -446,7 +446,7 @@ Pane {
                 })
                 backend.rate_rules.rowsRemoved.connect((_, first, last) => {
                     console.assert(first == last)
-                    model.remove(first.row)
+                    model.remove(2 + first)
                 })
                 backend.rate_rules.rowsInserted.connect((_, first, last) => {
                     console.assert(first, last, model.count - 1)
