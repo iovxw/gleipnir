@@ -20,6 +20,7 @@ use nfqueue;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
 };
+use nix::unistd::Uid;
 
 #[macro_use]
 mod utils;
@@ -30,6 +31,7 @@ mod polkit;
 mod proc;
 pub mod rpc_server;
 mod rules;
+mod netfilter;
 
 use rules::IndexedRules;
 
@@ -261,6 +263,10 @@ fn main() {
 
     q.create_queue(QUEUE_ID, queue_callback);
     q.set_mode(nfqueue::CopyMode::CopyPacket, MAX_IP_PKG_LEN);
+
+    if Uid::current().is_root() {
+        netfilter::register_nfqueue(QUEUE_ID);
+    }
 
     q.run_loop();
 

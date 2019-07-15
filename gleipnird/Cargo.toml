@@ -31,6 +31,7 @@ serde_json = "1.0"
 crossbeam-channel = "0.3"
 slab = "0.4"
 gleipnir-interface = { version = "0.1", path = "../gleipnir-interface" }
+ctrlc = { version = "3.1", features = ["termination"] }
 
 [build-dependencies]
 dbus-codegen = "0.3"
