@@ -3,7 +3,7 @@
 
 use std::cmp::min;
 use std::fmt;
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::ops::RangeInclusive;
 
@@ -187,7 +187,7 @@ impl Address for Ipv4Addr {
     type Nibbles = [u8; 8];
 
     fn nibbles(self) -> Self::Nibbles {
-        let mut ret: Self::Nibbles = unsafe { mem::uninitialized() };
+        let mut ret: Self::Nibbles = unsafe { MaybeUninit::uninit().assume_init() };
         let bytes: [u8; 4] = unsafe { mem::transmute(self) };
         for (i, byte) in bytes.iter().enumerate() {
             ret[i * 2] = byte >> 4;
@@ -227,7 +227,7 @@ impl Address for Ipv6Addr {
     type Nibbles = [u8; 32];
 
     fn nibbles(self) -> Self::Nibbles {
-        let mut ret: Self::Nibbles = unsafe { mem::uninitialized() };
+        let mut ret: Self::Nibbles = unsafe { MaybeUninit::uninit().assume_init() };
         let bytes: [u8; 16] = unsafe { mem::transmute(self) };
         for (i, byte) in bytes.iter().enumerate() {
             ret[i * 2] = byte >> 4;
