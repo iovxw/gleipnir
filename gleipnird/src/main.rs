@@ -17,21 +17,21 @@ use gleipnir_interface::{Device, PackageReport, Proto};
 use libc;
 use lru_time_cache::LruCache;
 use nfqueue;
+use nix::unistd::Uid;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
 };
-use nix::unistd::Uid;
 
 #[macro_use]
 mod utils;
 mod ablock;
 mod config;
+mod netfilter;
 mod netlink;
 mod polkit;
 mod proc;
 pub mod rpc_server;
 mod rules;
-mod netfilter;
 
 use rules::IndexedRules;
 

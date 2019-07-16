@@ -20,15 +20,15 @@ fn nft_exists() -> bool {
     false
 }
 
-fn iptables(exe: &str, cmd: &str, queue_num: u16) -> Command {
-    let mut c = Command::new(exe);
+fn iptables(v4: bool, output: bool, cmd: &str, queue_num: u16) -> Command {
+    let mut c = Command::new(if v4 { "iptables" } else { "ip6tables" });
     c.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg(format!("-{}", cmd))
-        .arg("OUTPUT")
+        .arg(if output { "OUTPUT" } else { "INPUT" })
         .arg("!")
-        .arg("-o")
+        .arg(if output { "-o" } else { "-i" })
         .arg("lo")
         .arg("-t")
         .arg("mangle")
@@ -41,17 +41,22 @@ fn iptables(exe: &str, cmd: &str, queue_num: u16) -> Command {
 }
 
 fn iptables_insert_nfqueue(num: u16) {
-    let rule_existed = iptables("iptables", "C", num).status().unwrap().success();
-    if !rule_existed {
-        iptables("iptables", "I", num).status().unwrap().success();
+    fn insert_if_not_exists(v4: bool, output: bool, num: u16) {
+        let rule_existed = iptables(v4, output, "C", num).status().unwrap().success();
+        if !rule_existed {
+            iptables(v4, output, "I", num).status().unwrap().success();
+        }
     }
-    let rule_existed = iptables("ip6tables", "C", num).status().unwrap().success();
-    if !rule_existed {
-        iptables("ip6tables", "I", num).status().unwrap().success();
-    }
+
+    insert_if_not_exists(false, false, num);
+    insert_if_not_exists(true, false, num);
+    insert_if_not_exists(false, true, num);
+    insert_if_not_exists(true, true, num);
 }
 
 fn iptables_remove_nfqueue(num: u16) {
-    iptables("iptables", "D", num).status().unwrap().success();
-    iptables("ip6tables", "D", num).status().unwrap().success();
+    iptables(false, false, "D", num).status().unwrap().success();
+    iptables(true, false, "D", num).status().unwrap().success();
+    iptables(false, true, "D", num).status().unwrap().success();
+    iptables(true, true, "D", num).status().unwrap().success();
 }
