@@ -189,6 +189,8 @@ Item {
                     }
                     Label {
                         x: logsTitle3.x
+                        width: logsTitle3.width
+                        clip: true
                         text: model.addr
                         anchors.verticalCenter: parent.verticalCenter
                     }
