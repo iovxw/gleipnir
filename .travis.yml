@@ -15,8 +15,38 @@ addons:
       - qt512graphicaleffects
       - qt512svg
       - qt512tools
+      # Qt plugins
+      - fcitx-frontend-qt5
+      - qt5-style-plugins
+      - qt5-style-kvantum
+      - kde-style-breeze
+      - kde-style-qtcurve-qt5
+      - kde-style-oxygen-qt5
+      - qt5ct
 install:
   - source /opt/qt512/bin/qt512-env.sh
+before_script:
+  - lrelease gleipnir/assets/i18n/*.ts
 script:
   - cargo build --verbose --all
   - cargo test --verbose --all --exclude qmetaobject
+after_script:
+  - cd gleipnir
+  - wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
+  - chmod +x ./linuxdeployqt-continuous-x86_64.AppImage
+  - cargo build --release
+  - cd linuxdeployqt.AppDir
+  - cp ../target/release/gleipnir .
+#  - cp ../assets/firewall.svg .
+  - sudo cp -vnpr /usr/lib/x86_64-linux-gnu/qt5/plugins/* $QTDIR/plugins/
+#  - export VERSION=`git describe --tags`
+  - ../linuxdeployqt-continuous-x86_64.AppImage gleipnir.desktop -appimage -no-translations -no-copy-copyright-files -verbose=2 -qmldir=../assets -extra-plugins=styles/libkvantum.so,styles/breeze.so,styles/qtcurve.so,styles/oxygen.so,platformthemes/libqt5ct.so,styles/libqt5ct-style.so
+  - export FILE=`ls -t *.AppImage | head -1`
+  - curl --upload-file $FILE https://transfer.sh/$FILE
+#deploy:
+#  provider: releases
+#  api_key: "$GITHUB_OAUTH_TOKEN"
+#  file: "$FILE"
+#  skip_cleanup: true
+#  on:
+#    tags: true

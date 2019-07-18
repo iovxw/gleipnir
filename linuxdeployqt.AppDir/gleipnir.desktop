@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gleipnir
+Exec=Gleipnir
+Icon=firewall
+Comment=Gleipnir
+Categories=Qt;System;Network;Monitor;
+X-AppImage-Version=dc0edf2
+
+Name[zh_CN]=Gleipnir
+Comment[zh_CN]=Gleipnir
