@@ -40,6 +40,7 @@ after_script:
   - cd linuxdeployqt.AppDir
   - cp ../target/release/gleipnir .
 #  - cp ../assets/firewall.svg .
+  - touch firewall.svg
   - sudo cp -vnpr /usr/lib/x86_64-linux-gnu/qt5/plugins/* $QTDIR/plugins/
 #  - export VERSION=`git describe --tags`
   - ../linuxdeployqt-continuous-x86_64.AppImage gleipnir.desktop -appimage -no-translations -no-copy-copyright-files -verbose=2 -qmldir=../assets -extra-plugins=styles/libkvantum.so,styles/breeze.so,styles/qtcurve.so,styles/oxygen.so,platformthemes/libqt5ct.so,styles/libqt5ct-style.so
