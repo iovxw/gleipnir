@@ -6,6 +6,8 @@ addons:
   apt:
     sources:
       - sourceline: 'ppa:beineri/opt-qt-5.12.1-xenial'
+      - sourceline: 'ppa:papirus/papirus'
+      - sourceline: 'ppa:hda-me/qt5ct'
     packages:
       - libnetfilter-queue-dev
       - libdbus-1-dev
