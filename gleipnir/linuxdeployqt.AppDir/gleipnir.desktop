@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Gleipnir
-Exec=Gleipnir
+Exec=gleipnir
 Icon=firewall
 Comment=Gleipnir
 Categories=Qt;System;Network;Monitor;
