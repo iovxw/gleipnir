@@ -38,7 +38,7 @@ after_script:
   - chmod +x ./linuxdeployqt-continuous-x86_64.AppImage
   - cargo build --release
   - cd linuxdeployqt.AppDir
-  - cp ../target/release/gleipnir .
+  - cp $TRAVIS_BUILD_DIR/target/release/gleipnir .
 #  - cp ../assets/firewall.svg .
   - touch firewall.svg
   - sudo cp -vnpr /usr/lib/x86_64-linux-gnu/qt5/plugins/* $QTDIR/plugins/
