@@ -15,6 +15,7 @@ addons:
       - qt512declarative
       - qt512quickcontrols2
       - qt512graphicaleffects
+      - qt512charts-no-lgpl
       - qt512svg
       - qt512tools
       # Qt plugins
