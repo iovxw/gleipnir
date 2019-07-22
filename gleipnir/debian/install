@@ -1,1 +1,1 @@
-target/release/gleipnir usr/bin
+../target/release/gleipnir usr/bin
