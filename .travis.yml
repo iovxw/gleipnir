@@ -26,6 +26,11 @@ addons:
       - kde-style-qtcurve-qt5
       - kde-style-oxygen-qt5
       - qt5ct
+      # deb packaging
+      - devscripts
+      - build-essential
+      - lintian
+      - dh-make
 install:
   - source /opt/qt512/bin/qt512-env.sh
 before_script:
@@ -47,6 +52,11 @@ after_script:
   - ../linuxdeployqt-continuous-x86_64.AppImage gleipnir.desktop -appimage -no-translations -no-copy-copyright-files -verbose=2 -qmldir=../assets -extra-plugins=styles/libkvantum.so,styles/breeze.so,styles/qtcurve.so,styles/oxygen.so,platformthemes/libqt5ct.so,styles/libqt5ct-style.so
   - export FILE=`ls -t *.AppImage | head -1`
   - curl --upload-file $FILE https://transfer.sh/$FILE
+  - cd $TRAVIS_BUILD_DIR/gleipnir
+  - debuild -b -us -uc
+  - cd ..
+  - export DEB=`ls -t *.deb | head -1`
+  - curl --upload-file $DEB https://transfer.sh/$DEB
 #deploy:
 #  provider: releases
 #  api_key: "$GITHUB_OAUTH_TOKEN"
