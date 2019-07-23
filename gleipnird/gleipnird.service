@@ -1,0 +1,8 @@
+[Unit]
+Description=Gleipnir Daemon
+
+[Service]
+ExecStart=/usr/bin/gleipnird
+
+[Install]
+WantedBy=multi-user.target
