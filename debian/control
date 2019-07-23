@@ -8,7 +8,7 @@ Homepage: https://github.com/iovxw/gleipnir
 Vcs-Git: https://github.com/iovxw/gleipnir.git
 Vcs-Browser: https://github.com/iovxw/gleipnir
 
-Package: gleipnir
+Package: gleipnird
 Architecture: any
 Depends: libdbus-1-3, ${shlibs:Depends}, ${misc:Depends}
 Description: <insert up to 60 chars description>

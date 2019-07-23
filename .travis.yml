@@ -53,7 +53,7 @@ after_script:
   - ../linuxdeployqt-continuous-x86_64.AppImage gleipnir.desktop -appimage -no-translations -no-copy-copyright-files -verbose=2 -qmldir=../assets -extra-plugins=styles/libkvantum.so,styles/breeze.so,styles/qtcurve.so,styles/oxygen.so,platformthemes/libqt5ct.so,styles/libqt5ct-style.so
   - export FILE=`ls -t *.AppImage | head -1`
   - curl --upload-file $FILE https://transfer.sh/$FILE
-  - cd $TRAVIS_BUILD_DIR/gleipnir
+  - cd $TRAVIS_BUILD_DIR
   - debuild -b -us -uc
   - cd ..
   - export DEB=`ls -t *.deb | head -1`
