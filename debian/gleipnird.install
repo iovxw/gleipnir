@@ -1,2 +1,2 @@
 target/release/gleipnird usr/bin
-gleipnird/gleipnird.service usr/lib/systemd/system
+gleipnird/gleipnird.service lib/systemd/system
