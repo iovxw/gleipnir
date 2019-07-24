@@ -13,10 +13,10 @@ addons:
       - libdbus-1-dev
       - mesa-common-dev
       - qt512declarative
-      - qt512quickcontrols
-      - qt512quickcontrols2
-      - qt512graphicaleffects
-      - qt512charts-no-lgpl
+      - qt512quickcontrols # qml-module-qtquick-dialogs
+      - qt512quickcontrols2 # qml-module-qtquick2
+      - qt512graphicaleffects # qml-module-qtgraphicaleffects
+      - qt512charts-no-lgpl # qml-module-qtcharts
       - qt512svg
       - qt512tools
       # Qt plugins
