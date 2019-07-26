@@ -8,8 +8,14 @@ Homepage: https://github.com/iovxw/gleipnir
 Vcs-Git: https://github.com/iovxw/gleipnir.git
 Vcs-Browser: https://github.com/iovxw/gleipnir
 
-Package: gleipnird
+#Package: gleipnird
+#Architecture: any
+#Depends: libdbus-1-3, libnetfilter-queue1, ${shlibs:Depends}, ${misc:Depends}
+#Description: Gleipnir Daemon
+# Per-process Network Firewall/Rate Limiter/Monitor for Linux Desktop
+
+Package: gleipnir
 Architecture: any
 Depends: libdbus-1-3, libnetfilter-queue1, ${shlibs:Depends}, ${misc:Depends}
-Description: Gleipnir Daemon
+Description: Gleipnir
  Per-process Network Firewall/Rate Limiter/Monitor for Linux Desktop

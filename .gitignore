@@ -3,6 +3,7 @@
 *.log
 *.substvars
 /debian/files
+/debian/gleipnir
 /debian/gleipnird
 # Rust
 /target
