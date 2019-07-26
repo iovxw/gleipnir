@@ -26,7 +26,7 @@ fn generate_code(interfaces: &[(&str, GenOpts)], outfile: &str) {
 fn main() {
     generate_code(
         &[(
-            "../data/org.freedesktop.PolicyKit1.Authority.xml",
+            "data/org.freedesktop.PolicyKit1.Authority.xml",
             GenOpts {
                 methodtype: None,
                 skipprefix: Some("org.freedesktop.PolicyKit1".into()),
