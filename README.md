@@ -6,7 +6,9 @@ Per-process Network Firewall/Rate Limiter/Monitor for Linux Desktop
 
 ## Install
 
-Download the `deb` package from [releases](https://github.com/iovxw/gleipnir/releases/latest), or [build it yourself](#Building)
+Download the `deb` package from [releases](https://github.com/iovxw/gleipnir/releases/latest), or [build it yourself](#building)
+
+***WARNING**: For compatibility reasons (Qt), the deb contains the client packaged as AppImage. It will be fixed someday*
 
 ## Building
 
@@ -24,8 +26,8 @@ Download the `deb` package from [releases](https://github.com/iovxw/gleipnir/rel
 
 Qt >= 5.10
 
- - libdbus-1-3
  - libnetfilter-queue1
+ - libdbus-1-3
  - qml-module-qtquick-dialogs
  - qml-module-qtquick2
  - qml-module-qtgraphicaleffects
