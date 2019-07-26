@@ -1,5 +1,5 @@
 target/release/gleipnird usr/bin
 gleipnird/gleipnird.service lib/systemd/system
 
-gleipnir/linuxdeployqt.AppDir/glepnir usr/bin
+gleipnir/linuxdeployqt.AppDir/gleipnir usr/bin
 gleipnir/linuxdeployqt.AppDir/gleipnir.desktop  usr/share/applications
