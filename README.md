@@ -1,5 +1,7 @@
 # gleipnir [![Build Status](https://travis-ci.com/iovxw/gleipnir.svg?branch=master)](https://travis-ci.com/iovxw/gleipnir)
 
+![screenshot](screenshot.png)
+
 ## License
 
 This is free and unencumbered software released into the public domain.
