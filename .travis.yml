@@ -1,7 +1,8 @@
 dist: xenial
 language: rust
+cache: cargo
 rust:
-  - nightly
+  - nightly-2019-07-07
 addons:
   apt:
     sources:
@@ -39,8 +40,8 @@ install:
 before_script:
   - lrelease gleipnir/assets/i18n/*.ts
 script:
-  - cargo build --verbose --all
-  - cargo test --verbose --all --exclude qmetaobject
+  - cargo build --release --verbose --all
+  - cargo test --release --verbose --all --exclude qmetaobject
 after_script:
   - cargo build --release
   - cd gleipnir
