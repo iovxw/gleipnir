@@ -38,6 +38,7 @@ qrc! { init_ressource,
          "assets/MonitorPage.qml",
          "assets/FirewallPage.qml",
          "assets/RateLimitRulesPopup.qml",
+         "assets/i18n/zh_CN.qm",
      },
 }
 

@@ -137,8 +137,7 @@
     <message>
         <location filename="../main.qml" line="94"/>
         <source>Daemon not found, start it manually?</source>
-        <translation>未找到
-守护进程，是否手动启动？</translation>
+        <translation>未找到守护进程，是否手动启动？</translation>
     </message>
     <message>
         <location filename="../main.qml" line="98"/>
