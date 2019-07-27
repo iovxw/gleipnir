@@ -8,3 +8,5 @@
 # Rust
 /target
 **/*.rs.bk
+# Qt
+*.qm
