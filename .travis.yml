@@ -42,7 +42,7 @@ before_script:
 script:
   - cargo build --release --verbose --all
   - cargo test --release --verbose --all --exclude qmetaobject
-after_script:
+before_deploy:
   - cargo build --release
   - cd gleipnir
   - wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
@@ -58,12 +58,12 @@ after_script:
   - cd $TRAVIS_BUILD_DIR
   - debuild -b -us -uc
   - cd ..
-  - export DEB=`ls -t *.deb | head -1`
-  - curl --upload-file $DEB https://transfer.sh/$DEB
-#deploy:
-#  provider: releases
-#  api_key: "$GITHUB_OAUTH_TOKEN"
-#  file: "$FILE"
-#  skip_cleanup: true
-#  on:
-#    tags: true
+  - export DEB=$PWD/`ls -t *.deb | head -1`
+#  - curl --upload-file $DEB https://transfer.sh/$DEB
+deploy:
+  provider: releases
+  api_key: "$GITHUB_OAUTH_TOKEN"
+  file: "$DEB"
+  skip_cleanup: true
+  on:
+    tags: true
