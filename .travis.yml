@@ -58,7 +58,7 @@ before_deploy:
   - cd $TRAVIS_BUILD_DIR
   - debuild -b -us -uc
   - cd ..
-  - export DEB=$PWD/`ls -t *.deb | head -1`
+  - export DEB=`ls -t *.deb | head -1`
 #  - curl --upload-file $DEB https://transfer.sh/$DEB
 deploy:
   provider: releases
