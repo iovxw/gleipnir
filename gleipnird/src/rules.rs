@@ -2,9 +2,11 @@ use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::{Duration, Instant};
 
+use intervaltree::IntervalTree;
 use lru_time_cache::LruCache;
 use treebitmap::IpLookupTable;
 
@@ -55,8 +57,7 @@ pub struct IndexedRules {
     any_v4: Vec<usize>,
     v6_table: IpLookupTable<Ipv6Addr, Vec<usize>>,
     any_v6: Vec<usize>,
-    // TODO: better memory usage
-    port: HashMap<u16, Vec<usize>>,
+    port: IntervalTree<u16, usize>,
     any_port: Vec<usize>,
     raw: Vec<Rule>,
     default_target: RuleTarget,
@@ -87,7 +88,7 @@ impl IndexedRules {
             any_v4: Default::default(),
             v6_table: IpLookupTable::new(),
             any_v6: Default::default(),
-            port: Default::default(),
+            port: IntervalTree::from_iter(vec![(0..0, 0); 0].into_iter()),
             any_port: Default::default(),
             raw: rules.clone(),
             default_target: default_target,
@@ -102,14 +103,15 @@ impl IndexedRules {
         let mut v4_hashmap: HashMap<(Ipv4Addr, u8), Vec<usize>> = HashMap::new();
         let mut v6_hashmap: HashMap<(Ipv6Addr, u8), Vec<usize>> = HashMap::new();
 
+        let mut port_rules = Vec::new();
+
         for (index, rule) in rules.into_iter().enumerate() {
             insert_rule!(r, rule, device, any_device, index);
             insert_rule!(r, rule, proto, any_proto, index);
             insert_rule!(r, rule, exe, any_exe, index);
             if let Some(port_range) = rule.port {
-                for port in port_range {
-                    r.port.entry(port).or_default().push(index);
-                }
+                let (start, end) = port_range.into_inner();
+                port_rules.push((start..end + 1, index));
             } else {
                 r.any_port.push(index);
             }
@@ -132,6 +134,8 @@ impl IndexedRules {
                 }
             }
         }
+
+        r.port = IntervalTree::from_iter(port_rules);
 
         for ((ip, masklen), index) in v4_hashmap {
             r.v4_table.insert(ip, masklen.into(), index);
@@ -181,7 +185,11 @@ impl IndexedRules {
         let exact_device = self.device.get(&device).unwrap_or(&empty);
         let exact_proto = self.proto.get(&protocol).unwrap_or(&empty);
         let exact_exe = self.exe.get(exe).unwrap_or(&empty);
-        let exact_port = self.port.get(&addr.port()).unwrap_or(&empty);
+        let exact_port = &self
+            .port
+            .query_point(addr.port())
+            .map(|v| v.value)
+            .collect::<Vec<_>>(); // TODO: zero alloc
         let (exact_ip, any_ip) = match addr.ip() {
             IpAddr::V4(ip) => (
                 self.v4_table
