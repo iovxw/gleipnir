@@ -298,11 +298,6 @@ mod test {
         proto.insert(Proto::Tcp, vec![1, 2]);
         let mut exe = HashMap::new();
         exe.insert("".into(), vec![3, 4]);
-        let mut port = HashMap::new();
-        for p in 10..=200 {
-            port.insert(p, vec![3]);
-        }
-        port.get_mut(&100).unwrap().push(4);
         let mut v4_hashmap = HashMap::new();
         v4_hashmap.insert(([1, 1, 1, 1], 32), vec![0, 1]);
         v4_hashmap.insert(([2, 2, 2, 2], 30), vec![2]);
@@ -316,7 +311,19 @@ mod test {
         assert_eq!(r.any_proto, vec![0, 3, 4]);
         assert_eq!(r.exe, exe);
         assert_eq!(r.any_exe, vec![0, 1, 2]);
-        assert_eq!(r.port, port);
+        for p in 10..=200 {
+            if p == 100 {
+                assert_eq!(
+                    r.port.query_point(p).map(|e| e.value).collect::<Vec<_>>(),
+                    vec![4, 3]
+                );
+            } else {
+                assert_eq!(
+                    r.port.query_point(p).map(|e| e.value).collect::<Vec<_>>(),
+                    vec![3]
+                );
+            }
+        }
         assert_eq!(r.any_port, vec![0, 1, 2]);
         assert_eq!(r.raw, raw_rules);
         assert_eq!(r.default_target, RuleTarget::Drop);
