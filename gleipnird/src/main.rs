@@ -1,6 +1,5 @@
 #![feature(const_fn)]
-#![feature(async_await)]
-#![feature(existential_type)]
+#![feature(type_alias_impl_trait)]
 #![feature(try_blocks)]
 
 #[global_allocator]
@@ -14,9 +13,8 @@ use std::thread;
 
 use crossbeam_channel;
 use gleipnir_interface::{Device, PackageReport, Proto};
-use libc;
 use lru_time_cache::LruCache;
-use nfqueue;
+use nfq;
 use nix::unistd::Uid;
 use pnet::packet::{
     ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, ipv6::Ipv6Packet, tcp::TcpPacket, udp::UdpPacket,
@@ -134,7 +132,7 @@ impl State {
     }
 }
 
-fn queue_callback(msg: nfqueue::Message, state: &mut State) {
+fn queue_callback(msg: &mut nfq::Message, state: &mut State) {
     let device = if msg.get_indev() != 0 {
         Device::Input
     } else if msg.get_outdev() != 0 {
@@ -188,7 +186,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
         }
         _ => {
             // ignore other protocol
-            msg.set_verdict(nfqueue::Verdict::Accept);
+            msg.set_verdict(nfq::Verdict::Accept);
             return;
         }
     };
@@ -198,7 +196,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
         Ok(r) => r,
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
             eprintln!("NOT FOUND: {:?},\t{},\t{},\t{}", device, protocol, src, dst);
-            msg.set_verdict(nfqueue::Verdict::Accept);
+            msg.set_verdict(nfq::Verdict::Accept);
             return;
         }
         Err(e) => {
@@ -206,7 +204,7 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
                 "ERROR: {},\t{:?},\t{},\t{},\t{}",
                 e, device, protocol, src, dst
             );
-            msg.set_verdict(nfqueue::Verdict::Accept);
+            msg.set_verdict(nfq::Verdict::Accept);
             return;
         }
     };
@@ -227,9 +225,9 @@ fn queue_callback(msg: nfqueue::Message, state: &mut State) {
     };
 
     if accept {
-        msg.set_verdict(nfqueue::Verdict::Accept);
+        msg.set_verdict(nfq::Verdict::Accept);
     } else {
-        msg.set_verdict(nfqueue::Verdict::Drop);
+        msg.set_verdict(nfq::Verdict::Drop);
     }
 
     state.pkt_logs.try_send(log).expect("logs service dead");
@@ -240,13 +238,13 @@ fn main() {
 
     let (rules_reader, rules_setter) = ablock::AbLock::new(IndexedRules::from(rules.clone()));
     let (sender, receiver) = crossbeam_channel::unbounded();
-    let state = State {
+    let mut state = State {
         diag: netlink::SockDiag::new().expect(""),
         rules: rules_reader,
         pkt_logs: sender,
         cache: LruCache::with_capacity(2048),
     };
-    let mut q = nfqueue::Queue::new(state);
+    let mut q = nfq::Queue::open().expect("");
 
     thread::spawn(|| {
         if let Err(e) = rpc_server::run(rules, rules_setter, receiver) {
@@ -255,22 +253,19 @@ fn main() {
         }
     });
 
-    q.open();
-    q.unbind(libc::AF_INET); // ignore result, failure is not critical here
-    q.unbind(libc::AF_INET6);
-    assert_eq!(q.bind(libc::AF_INET), 0);
-    assert_eq!(q.bind(libc::AF_INET6), 0);
-
-    q.create_queue(QUEUE_ID, queue_callback);
-    q.set_mode(nfqueue::CopyMode::CopyPacket, MAX_IP_PKG_LEN);
+    q.bind(QUEUE_ID).expect("");
+    // The max size of IPv4 + TCP is (20 + 40 optional) + (20 + 40 optional) = 120
+    q.set_copy_range(QUEUE_ID, 128);
 
     if Uid::current().is_root() {
         netfilter::register_nfqueue(QUEUE_ID);
     }
 
-    q.run_loop();
-
-    q.close();
+    loop {
+        let mut msg = q.recv().expect("");
+        queue_callback(&mut msg, &mut state);
+        q.verdict(msg).expect("");
+    }
 }
 
 #[allow(unused)]
