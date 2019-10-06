@@ -15,7 +15,7 @@ pnetlink = { version = "0.0.3", git = "https://github.com/polachok/pnetlink.git"
 lazy_static = "1.0"
 treebitmap = "0.3"
 lru_time_cache = "0.9"
-dbus = "0.6"
+dbus = "0.7"
 nix = "0.13"
 rpc = { package = "tarpc-lib", version = "0.6", git = "https://github.com/iovxw/tarpc.git", branch = "update-futures" }
 tarpc = { version = "0.18",  features = ["serde1"], git = "https://github.com/iovxw/tarpc.git", branch = "update-futures" }
@@ -35,4 +35,4 @@ gleipnir-interface = { version = "0.1", path = "../gleipnir-interface" }
 ctrlc = { version = "3.1", features = ["termination"] }
 
 [build-dependencies]
-dbus-codegen = "0.3"
+dbus-codegen = "0.4"
