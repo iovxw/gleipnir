@@ -55,9 +55,9 @@ impl Drop for Daemon {
 }
 
 impl daemon::Service for Daemon {
-    existential type SetRulesFut: Future<Output = ()>;
-    existential type UnlockFut: Future<Output = bool>;
-    existential type InitMonitorFut: Future<Output = ()>;
+    type SetRulesFut = impl Future<Output = ()>;
+    type UnlockFut = impl Future<Output = bool>;
+    type InitMonitorFut = impl Future<Output = ()>;
 
     fn set_rules(self, _: context::Context, rules: Rules) -> Self::SetRulesFut {
         async move {
