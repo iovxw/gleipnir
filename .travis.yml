@@ -2,7 +2,7 @@ dist: xenial
 language: rust
 cache: cargo
 rust:
-  - nightly-2019-07-07
+  - nightly
 addons:
   apt:
     sources:
