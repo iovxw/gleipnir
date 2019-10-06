@@ -2,7 +2,6 @@
 #![feature(try_blocks)]
 #![feature(result_map_or_else)]
 #![feature(vec_remove_item)]
-#![feature(async_await)]
 #![recursion_limit = "128"]
 
 #[global_allocator]
