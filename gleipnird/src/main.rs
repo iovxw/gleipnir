@@ -217,7 +217,7 @@ fn queue_callback(msg: &mut nfq::Message, state: &mut State) {
         device,
         protocol,
         addr: rule_addr,
-        len: payload.len(),
+        len: msg.get_original_len(),
         exe: proc.exe,
         dropped: !accept,
         matched_rule: rule_id,
