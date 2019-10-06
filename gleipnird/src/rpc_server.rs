@@ -13,7 +13,6 @@ use futures::{
     executor::block_on,
     future::poll_fn,
     prelude::*,
-    FutureExt,
 };
 use futures_locks::Mutex;
 use gleipnir_interface::{daemon, monitor, unixtransport, PackageReport, Rules};

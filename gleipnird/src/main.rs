@@ -34,7 +34,6 @@ mod rules;
 use rules::IndexedRules;
 
 const QUEUE_ID: u16 = 786;
-const MAX_IP_PKG_LEN: u32 = 0xFFFF;
 
 struct State {
     diag: netlink::SockDiag,
@@ -233,6 +232,7 @@ fn queue_callback(msg: &mut nfq::Message, state: &mut State) {
     state.pkt_logs.try_send(log).expect("logs service dead");
 }
 
+// TODO: expect messages
 fn main() {
     let rules = config::load_rules().expect("Failed to load rules");
 
@@ -255,7 +255,7 @@ fn main() {
 
     q.bind(QUEUE_ID).expect("");
     // The max size of IPv4 + TCP is (20 + 40 optional) + (20 + 40 optional) = 120
-    q.set_copy_range(QUEUE_ID, 128);
+    q.set_copy_range(QUEUE_ID, 128).expect("");
 
     if Uid::current().is_root() {
         netfilter::register_nfqueue(QUEUE_ID);

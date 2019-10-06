@@ -6,7 +6,6 @@ use futures::{
     compat::Executor01CompatExt,
     future::{self, Ready},
     prelude::*,
-    FutureExt,
 };
 use gleipnir_interface::{monitor, unixtransport, PackageReport, Rules};
 use rpc::context;
