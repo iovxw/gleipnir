@@ -20,7 +20,7 @@ use rpc::context;
 use rpc::server::Server;
 use slab::Slab;
 
-use crate::ablock::AbSetter;
+use crate::lrlock::Setter;
 use crate::config;
 use crate::rules::IndexedRules;
 
@@ -28,7 +28,7 @@ use crate::rules::IndexedRules;
 struct Daemon {
     pid: u32,
     authenticated: Arc<AtomicBool>,
-    rules_setter: Arc<Mutex<AbSetter<IndexedRules>>>,
+    rules_setter: Arc<Mutex<Setter<IndexedRules>>>,
     rules: Arc<Mutex<Rules>>,
     clients: Arc<Mutex<Slab<monitor::Client>>>,
     client_id: Arc<Mutex<Option<usize>>>,
@@ -140,7 +140,7 @@ impl daemon::Service for Daemon {
 
 pub fn run(
     rules: Rules,
-    rules_setter: AbSetter<IndexedRules>,
+    rules_setter: Setter<IndexedRules>,
     pkt_logs: crossbeam_channel::Receiver<PackageReport>,
 ) -> Result<(), std::io::Error> {
     let addr = std::path::PathBuf::from("/var/run/gleipnird");
