@@ -1,4 +1,3 @@
-#![feature(async_await)]
 #![feature(proc_macro_hygiene)]
 
 use std::cmp::min;
