@@ -2,9 +2,7 @@ use std::fs;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use defer::defer;
 use futures::{
-    compat::Executor01CompatExt,
     future::{self, Ready},
     prelude::*,
 };

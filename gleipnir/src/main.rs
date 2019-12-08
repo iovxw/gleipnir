@@ -1,6 +1,5 @@
 #![feature(try_trait)]
 #![feature(try_blocks)]
-#![feature(result_map_or_else)]
 #![feature(vec_remove_item)]
 #![recursion_limit = "128"]
 
