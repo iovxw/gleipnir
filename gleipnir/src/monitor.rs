@@ -2,19 +2,21 @@ use std::fs;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use defer::defer;
 use futures::{
     compat::Executor01CompatExt,
     future::{self, Ready},
     prelude::*,
 };
-use gleipnir_interface::{monitor, unixtransport, PackageReport, Rules};
-use rpc::context;
-use rpc::server::Server;
+use gleipnir_interface::{unixtransport, Monitor, PackageReport, Rules};
+use tarpc::rpc::context::Context;
+use tarpc::server::Channel;
+use tokio_serde::formats::Bincode;
 
 pub static MONITOR_RUNNING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
-struct Monitor<F0, F1>
+struct MyMonitor<F0, F1>
 where
     F0: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
     F1: Fn(Rules) + Send + Sync + Clone + 'static,
@@ -23,18 +25,18 @@ where
     on_rules_updated: F1,
 }
 
-impl<F0, F1> monitor::Service for Monitor<F0, F1>
+impl<F0, F1> Monitor for MyMonitor<F0, F1>
 where
     F0: Fn(Vec<PackageReport>) + Send + Sync + Clone + 'static,
     F1: Fn(Rules) + Send + Sync + Clone + 'static,
 {
     type OnPackagesFut = Ready<()>;
     type OnRulesUpdatedFut = Ready<()>;
-    fn on_packages(self, _: context::Context, logs: Vec<PackageReport>) -> Self::OnPackagesFut {
+    fn on_packages(self, _: Context, logs: Vec<PackageReport>) -> Self::OnPackagesFut {
         (self.on_packages)(logs);
         future::ready(())
     }
-    fn on_rules_updated(self, _: context::Context, rules: Rules) -> Self::OnRulesUpdatedFut {
+    fn on_rules_updated(self, _: Context, rules: Rules) -> Self::OnRulesUpdatedFut {
         (self.on_rules_updated)(rules);
         future::ready(())
     }
@@ -54,33 +56,22 @@ where
         }
     }
 
-    let transport = unixtransport::listen(&addr)?;
-    MONITOR_RUNNING.store(true, Ordering::Release);
+    let server = async {
+        let incoming = unixtransport::listen(&addr, Bincode::default).await?;
+        MONITOR_RUNNING.store(true, Ordering::Release);
+        incoming
+            .filter_map(|r| future::ready(r.ok()))
+            .map(|(_peer_pid, transport)| tarpc::server::BaseChannel::with_defaults(transport))
+            .for_each(move |channel| {
+                let server = MyMonitor {
+                    on_packages: on_packages.clone(),
+                    on_rules_updated: on_rules_updated.clone(),
+                };
+                channel.respond_with(server.serve()).execute()
+            })
+            .await;
+        Ok(())
+    };
 
-    let server = Server::default()
-        .incoming(transport)
-        .and_then(move |channel| {
-            let on_packages = on_packages.clone();
-            let on_rules_updated = on_rules_updated.clone();
-            async move {
-                channel
-                    .respond_with(monitor::serve(Monitor {
-                        on_packages,
-                        on_rules_updated,
-                    }))
-                    .await;
-                Ok(())
-            }
-                .boxed()
-        })
-        .map_err(|e| {
-            dbg!(e);
-        })
-        .for_each(|_| futures::future::ready(()))
-        .map(|()| MONITOR_RUNNING.store(false, Ordering::Release));
-
-    rpc::init(tokio::executor::DefaultExecutor::current().compat());
-    tokio::run(server.unit_error().boxed().compat());
-
-    Ok(())
+    tokio::runtime::Runtime::new().unwrap().block_on(server)
 }

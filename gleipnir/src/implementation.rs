@@ -14,16 +14,15 @@ use std::sync::atomic::Ordering;
 use std::thread;
 
 use failure::{self, Fail};
-use futures::{
-    compat::{Compat, Executor01CompatExt},
-    future::FutureExt,
-};
+use futures::future::FutureExt;
 use gleipnir_interface::{
-    daemon, unixtransport, Device, PackageReport, Proto, RateLimitRule, Rule, RuleTarget, Rules,
+    unixtransport, DaemonClient, Device, PackageReport, Proto, RateLimitRule, Rule, RuleTarget,
+    Rules,
 };
 use qmetaobject::*;
 use tarpc;
-use tokio::runtime::current_thread::Runtime;
+use tokio::runtime::Runtime;
+use tokio_serde::formats::Bincode;
 
 use crate::implementation;
 use crate::listmodel::{MutListItem, MutListModel};
@@ -226,7 +225,7 @@ pub struct Backend {
     traffic_history: HashMap<String, Vec<u32>>,
     // prev_proc_on_chart: Vec<String>,
     runtime: Runtime,
-    client: Option<daemon::Client>,
+    client: Option<DaemonClient>,
 }
 
 impl Backend {
@@ -235,8 +234,6 @@ impl Backend {
         let default_target = 0;
 
         let runtime = Runtime::new().unwrap();
-
-        tarpc::init(tokio::executor::DefaultExecutor::current().compat());
 
         // TODO
         let rate_rules = MutListModel::from_iter(vec![]);
@@ -303,24 +300,23 @@ impl Backend {
 
         let authed = self
             .runtime
-            .block_on(Compat::new(
+            .block_on(
                 self.client
                     .as_mut()
                     .expect("")
                     .unlock(tarpc::context::current())
                     .boxed(),
-            ))
+            )
             .unwrap();
         dbg!(authed);
 
         self.runtime
-            .block_on(Compat::new(
+            .block_on(
                 self.client
                     .as_mut()
                     .expect("")
-                    .set_rules(tarpc::context::current(), rules)
-                    .boxed(),
-            ))
+                    .set_rules(tarpc::context::current(), rules),
+            )
             .unwrap();
     }
 
@@ -390,18 +386,17 @@ impl Backend {
             });
             while !monitor::MONITOR_RUNNING.load(Ordering::Acquire) {}
         }
-        let client: Result<daemon::Client, io::Error> = self.runtime.block_on(Compat::new(
-            async {
-                let transport = unixtransport::connect("/var/run/gleipnird").await?;
-                let mut client =
-                    daemon::new_stub(tarpc::client::Config::default(), transport).await?;
-                client
-                    .init_monitor(tarpc::context::current(), "/tmp/gleipnir".to_string())
-                    .await?;
-                Ok(client)
-            }
-                .boxed(),
-        ));
+        let client: Result<DaemonClient, io::Error> = self.runtime.block_on(async {
+            let (_, transport) =
+                unixtransport::connect("/var/run/gleipnird", Bincode::default()).await?;
+            let mut client =
+                gleipnir_interface::DaemonClient::new(tarpc::client::Config::default(), transport)
+                    .spawn()?;
+            client
+                .init_monitor(tarpc::context::current(), "/tmp/gleipnir".to_string())
+                .await?;
+            Ok(client)
+        });
         let client = client?;
         self.client = Some(client);
         self.daemon_connected = true;

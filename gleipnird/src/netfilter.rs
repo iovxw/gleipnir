@@ -4,7 +4,6 @@ use ctrlc;
 
 pub fn register_nfqueue(num: u16) {
     if nft_exists() {
-
     } else {
         iptables_insert_nfqueue(num);
         ctrlc::set_handler(move || {

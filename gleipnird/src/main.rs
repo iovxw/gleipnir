@@ -22,8 +22,8 @@ use pnet::packet::{
 
 #[macro_use]
 mod utils;
-mod lrlock;
 mod config;
+mod lrlock;
 mod netfilter;
 mod netlink;
 mod polkit;
@@ -236,7 +236,8 @@ fn queue_callback(msg: &mut nfq::Message, state: &mut State) {
 fn main() {
     let rules = config::load_rules().expect("Failed to load rules");
 
-    let (rules_reader, rules_setter) = lrlock::LeftRightLock::new(IndexedRules::from(rules.clone()));
+    let (rules_reader, rules_setter) =
+        lrlock::LeftRightLock::new(IndexedRules::from(rules.clone()));
     let (sender, receiver) = crossbeam_channel::unbounded();
     let mut state = State {
         diag: netlink::SockDiag::new().expect(""),

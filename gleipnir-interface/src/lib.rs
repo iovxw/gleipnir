@@ -11,13 +11,11 @@ use serde::{Deserialize, Serialize};
 
 pub mod unixtransport;
 
-pub mod daemon {
-    use super::Rules;
-    tarpc::service! {
-        rpc init_monitor(socket_path: String);
-        rpc unlock() -> bool;
-        rpc set_rules(rules: Rules);
-    }
+#[tarpc::service]
+pub trait Daemon {
+    async fn init_monitor(socket_path: String);
+    async fn unlock() -> bool;
+    async fn set_rules(rules: Rules);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -33,12 +31,10 @@ pub struct RateLimitRule {
     pub limit: usize,
 }
 
-pub mod monitor {
-    use super::*;
-    tarpc::service! {
-        rpc on_packages(logs: Vec<PackageReport>);
-        rpc on_rules_updated(rules: Rules);
-    }
+#[tarpc::service]
+pub trait Monitor {
+    async fn on_packages(logs: Vec<PackageReport>);
+    async fn on_rules_updated(rules: Rules);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

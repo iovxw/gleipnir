@@ -40,7 +40,10 @@ impl<T> Reader<T> {
             value: if side {
                 &self.0.left
             } else {
-                self.0.right.as_ref().expect("unreachable LeftRightLock state")
+                self.0
+                    .right
+                    .as_ref()
+                    .expect("unreachable LeftRightLock state")
             },
             state: &self.0.state,
         }

@@ -1,6 +1,4 @@
 use std::fs;
-use std::io;
-use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,33 +6,30 @@ use std::sync::Arc;
 use std::thread;
 
 use crossbeam_channel;
-use futures::{
-    compat::{Compat, Executor01CompatExt, Future01CompatExt},
-    executor::block_on,
-    future::poll_fn,
-    prelude::*,
-};
+use futures::{compat::Future01CompatExt, executor::block_on, prelude::*};
 use futures_locks::Mutex;
-use gleipnir_interface::{daemon, monitor, unixtransport, PackageReport, Rules};
-use rpc::context;
-use rpc::server::Server;
+use gleipnir_interface::{self, unixtransport, Daemon, PackageReport, Rules};
 use slab::Slab;
+use tarpc::rpc::context::Context;
+use tarpc::server::Channel;
+use tokio::task::block_in_place;
+use tokio_serde::formats::Bincode;
 
-use crate::lrlock::Setter;
 use crate::config;
+use crate::lrlock::Setter;
 use crate::rules::IndexedRules;
 
 #[derive(Clone)]
-struct Daemon {
-    pid: u32,
+struct MyDaemon {
+    peer_pid: u32,
     authenticated: Arc<AtomicBool>,
     rules_setter: Arc<Mutex<Setter<IndexedRules>>>,
     rules: Arc<Mutex<Rules>>,
-    clients: Arc<Mutex<Slab<monitor::Client>>>,
+    clients: Arc<Mutex<Slab<gleipnir_interface::MonitorClient>>>,
     client_id: Arc<Mutex<Option<usize>>>,
 }
 
-impl Drop for Daemon {
+impl Drop for MyDaemon {
     fn drop(&mut self) {
         // TODO: a better way, don't let client_id cloned outside Daemon
         if Arc::strong_count(&self.client_id) > 1 {
@@ -45,7 +40,6 @@ impl Drop for Daemon {
             _ => return,
         };
         if let Some(client_id) = client_id.take() {
-            dbg!("dropped");
             block_on(self.clients.lock().compat())
                 .unwrap()
                 .remove(client_id);
@@ -53,12 +47,12 @@ impl Drop for Daemon {
     }
 }
 
-impl daemon::Service for Daemon {
+impl gleipnir_interface::Daemon for MyDaemon {
     type SetRulesFut = impl Future<Output = ()>;
     type UnlockFut = impl Future<Output = bool>;
     type InitMonitorFut = impl Future<Output = ()>;
 
-    fn set_rules(self, _: context::Context, rules: Rules) -> Self::SetRulesFut {
+    fn set_rules(self, _: Context, rules: Rules) -> Self::SetRulesFut {
         async move {
             if self.authenticated.load(Ordering::Relaxed) {
                 let indexed_rules = IndexedRules::from(rules.clone());
@@ -83,36 +77,24 @@ impl daemon::Service for Daemon {
                                 .await
                             {
                                 // TODO: remove client from clients?
-                                // dbg!(e);
+                                dbg!(e);
                             }
                         }
                     }
-                    Ok(())
                 };
-                tokio::spawn(Compat::new(boardcast.boxed()));
+                tokio::spawn(boardcast);
             }
         }
     }
-    fn unlock(self, _: context::Context) -> Self::UnlockFut {
-        use futures::task::Poll;
-        use tokio::prelude::Async;
+    fn unlock(self, _: Context) -> Self::UnlockFut {
         async move {
-            let authenticated = poll_fn(|_| {
-                if let Async::Ready(r) =
-                    tokio_threadpool::blocking(|| crate::polkit::check_authorization(self.pid))
-                        .unwrap()
-                {
-                    Poll::Ready(r)
-                } else {
-                    Poll::Pending
-                }
-            })
-            .await;
+            let authenticated =
+                block_in_place(|| crate::polkit::check_authorization(self.peer_pid));
             self.authenticated.store(authenticated, Ordering::Relaxed);
             authenticated
         }
     }
-    fn init_monitor(self, _: context::Context, socket_path: String) -> Self::InitMonitorFut {
+    fn init_monitor(self, _: Context, socket_path: String) -> Self::InitMonitorFut {
         async move {
             let r: Result<(), failure::Error> = try {
                 let mut clients = self.clients.lock().compat().await.unwrap();
@@ -122,9 +104,13 @@ impl daemon::Service for Daemon {
                     return;
                 }
 
-                let transport = unixtransport::connect(&socket_path).await?;
-                let mut client =
-                    monitor::new_stub(tarpc::client::Config::default(), transport).await?;
+                let (_, transport) =
+                    unixtransport::connect(&socket_path, Bincode::default()).await?;
+                let mut client = gleipnir_interface::MonitorClient::new(
+                    tarpc::client::Config::default(),
+                    transport,
+                )
+                .spawn()?;
                 let rules = self.rules.lock().compat().await.unwrap().clone();
                 client
                     .on_rules_updated(tarpc::context::current(), rules)
@@ -155,51 +141,40 @@ pub fn run(
     let rules_setter = Arc::new(Mutex::new(rules_setter));
     let rules = Arc::new(Mutex::new(rules));
 
-    let transport = unixtransport::listen(&addr)?;
-
-    let permissions = fs::Permissions::from_mode(755);
-    fs::set_permissions(&addr, permissions)?;
-
-    let clients = Arc::new(Mutex::new(Slab::new()));
+    let clients: Arc<Mutex<Slab<gleipnir_interface::MonitorClient>>> =
+        Arc::new(Mutex::new(Slab::new()));
     let clients2 = clients.clone();
 
-    let server = Server::default()
-        .incoming(transport)
-        .map_ok(move |channel| {
-            // This is a hack, see unixtransport module
-            let pid: u32 = if let SocketAddr::V4(addr) = channel.client_addr() {
-                (*addr.ip()).into()
-            } else {
-                unreachable!()
-            };
-            dbg!(pid);
+    let mut runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
-            let clients = clients.clone();
-            let rules_setter = rules_setter.clone();
-            let rules = rules.clone();
-            tokio::executor::spawn(Compat::new(
-                async move {
-                    channel
-                        .respond_with(daemon::serve(Daemon {
-                            pid,
-                            authenticated: Arc::new(AtomicBool::new(false)),
-                            rules_setter,
-                            rules,
-                            clients,
-                            client_id: Arc::new(Mutex::new(None)),
-                        }))
-                        .await;
-                    Ok(())
-                }
-                    .map_err(|e: io::Error| eprintln!("Connecting to client: {}", e))
-                    .boxed(),
-            ));
-        })
-        .map_err(|e: io::Error| eprintln!("RPC Server: {}", e))
-        .for_each(|_| futures::future::ready(()));
+    let server = async move {
+        let incoming = unixtransport::listen(&addr, Bincode::default).await?;
+        fs::set_permissions(&addr, fs::Permissions::from_mode(755))?;
 
-    let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
-    let executor = runtime.executor();
+        incoming
+            .filter_map(|r| future::ready(r.ok()))
+            .map(|(peer_pid, transport)| {
+                (
+                    peer_pid,
+                    tarpc::server::BaseChannel::with_defaults(transport),
+                )
+            })
+            .for_each(move |(peer_pid, channel)| {
+                let server = MyDaemon {
+                    peer_pid,
+                    authenticated: Arc::new(AtomicBool::new(false)),
+                    rules_setter: rules_setter.clone(),
+                    rules: rules.clone(),
+                    clients: clients.clone(),
+                    client_id: Arc::new(Mutex::new(None)),
+                };
+                channel.respond_with(server.serve()).execute()
+            })
+            .await;
+        Ok(())
+    };
+
+    let handle = runtime.handle().clone();
 
     thread::spawn(move || loop {
         let mut logs = Vec::new();
@@ -212,18 +187,12 @@ pub fn run(
                     .on_packages(tarpc::context::current(), logs.clone())
                     .await;
                 if let Err(e) = r {
-                    // dbg!(e);
+                    dbg!(e);
                 }
             }
-            Ok(())
         };
-        executor.spawn(Compat::new(fut.boxed()));
+        handle.spawn(fut);
     });
 
-    rpc::init(runtime.executor().compat());
-    runtime
-        .block_on_all(server.unit_error().boxed().compat())
-        .expect("run tokio runtime");
-
-    Ok(())
+    runtime.block_on(server)
 }

@@ -1,138 +1,97 @@
 use std::io;
 use std::marker::PhantomData;
-use std::net::SocketAddr;
 use std::os::unix::io::AsRawFd;
+use std::os::unix::net::SocketAddr;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::{compat::*, prelude::*, ready};
+use futures::{prelude::*, ready};
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
-use pin_utils::unsafe_pinned;
+use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
+use tarpc::serde_transport::Transport;
 use tokio::net::{UnixListener, UnixStream};
+use tokio_serde::{Deserializer, Serializer};
 
-pub struct UnixTransport<Item, SinkItem> {
-    pid: u32,
-    inner: bincode_transport::Transport<UnixStream, Item, SinkItem>,
-}
-
-impl<Item, SinkItem> UnixTransport<Item, SinkItem> {
-    unsafe_pinned!(inner: bincode_transport::Transport<UnixStream, Item, SinkItem>);
-
-    pub fn new(io: UnixStream) -> UnixTransport<Item, SinkItem>
-    where
-        Item: for<'de> Deserialize<'de>,
-        SinkItem: Serialize,
-    {
-        let pid = getsockopt(io.as_raw_fd(), PeerCredentials).unwrap().pid() as u32;
-        UnixTransport {
-            inner: io.into(),
-            pid,
-        }
-    }
-}
-
-impl<Item, SinkItem> Stream for UnixTransport<Item, SinkItem>
-where
-    Item: for<'a> Deserialize<'a>,
-{
-    type Item = io::Result<Item>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<io::Result<Item>>> {
-        self.inner().poll_next(cx)
-    }
-}
-
-impl<Item, SinkItem> Sink<SinkItem> for UnixTransport<Item, SinkItem>
-where
-    SinkItem: Serialize,
-{
-    type Error = io::Error;
-
-    fn start_send(self: Pin<&mut Self>, item: SinkItem) -> io::Result<()> {
-        self.inner().start_send(item)
-    }
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.inner().poll_ready(cx)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.inner().poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.inner().poll_close(cx)
-    }
-}
-
-impl<Item, SinkItem> rpc::Transport for UnixTransport<Item, SinkItem>
+/// Returns a new JSON transport that reads from and writes to `io`.
+pub fn new<Item, SinkItem, Codec>(
+    io: UnixStream,
+    codec: Codec,
+) -> (u32, Transport<UnixStream, Item, SinkItem, Codec>)
 where
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
+    Codec: Serializer<SinkItem> + Deserializer<Item>,
 {
-    type Item = Item;
-    type SinkItem = SinkItem;
-
-    fn peer_addr(&self) -> io::Result<SocketAddr> {
-        // HACK! return the pid of peer
-        Ok((std::net::Ipv4Addr::from(self.pid), 0).into())
-    }
-
-    fn local_addr(&self) -> io::Result<SocketAddr> {
-        panic!("UnixTransport doesn't have a net::SocketAddr")
-    }
+    let peer_pid = getsockopt(io.as_raw_fd(), PeerCredentials).unwrap().pid() as u32;
+    (peer_pid, Transport::from((io, codec)))
 }
 
-/// Returns a new bincode transport that reads from and writes to `io`.
-
-/// Connects to `addr`, wrapping the connection in a bincode transport.
-pub async fn connect<Item, SinkItem>(addr: &str) -> io::Result<UnixTransport<Item, SinkItem>>
+/// Connects to `addr`, wrapping the connection in a JSON transport.
+pub async fn connect<A, Item, SinkItem, Codec>(
+    addr: A,
+    codec: Codec,
+) -> io::Result<(u32, Transport<UnixStream, Item, SinkItem, Codec>)>
 where
+    A: AsRef<Path>,
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
+    Codec: Serializer<SinkItem> + Deserializer<Item>,
 {
-    Ok(UnixTransport::new(
-        UnixStream::connect(addr).compat().await?,
-    ))
+    Ok(new(UnixStream::connect(addr).await?, codec))
 }
 
-/// Listens on `addr`, wrapping accepted connections in bincode transports.
-pub fn listen<P, Item, SinkItem>(addr: P) -> io::Result<Incoming<Item, SinkItem>>
+/// Listens on `addr`, wrapping accepted connections in JSON transports.
+pub async fn listen<A, Item, SinkItem, Codec, CodecFn>(
+    addr: A,
+    codec_fn: CodecFn,
+) -> io::Result<Incoming<Item, SinkItem, Codec, CodecFn>>
 where
-    P: AsRef<Path>,
+    A: AsRef<Path>,
     Item: for<'de> Deserialize<'de>,
-    SinkItem: Serialize,
+    Codec: Serializer<SinkItem> + Deserializer<Item>,
+    CodecFn: Fn() -> Codec,
 {
     let listener = UnixListener::bind(addr)?;
-    let incoming = listener.incoming().compat();
+    let local_addr = listener.local_addr()?;
     Ok(Incoming {
-        incoming,
+        listener,
+        codec_fn,
+        local_addr,
         ghost: PhantomData,
     })
 }
 
-/// A [`TcpListener`] that wraps connections in bincode transports.
+/// A [`TcpListener`] that wraps connections in JSON transports.
+#[pin_project]
 #[derive(Debug)]
-pub struct Incoming<Item, SinkItem> {
-    incoming: Compat01As03<tokio::net::unix::Incoming>,
-    ghost: PhantomData<(Item, SinkItem)>,
+pub struct Incoming<Item, SinkItem, Codec, CodecFn> {
+    listener: UnixListener,
+    local_addr: SocketAddr,
+    codec_fn: CodecFn,
+    ghost: PhantomData<(Item, SinkItem, Codec)>,
 }
 
-impl<Item, SinkItem> Incoming<Item, SinkItem> {
-    unsafe_pinned!(incoming: Compat01As03<tokio::net::unix::Incoming>);
+impl<Item, SinkItem, Codec, CodecFn> Incoming<Item, SinkItem, Codec, CodecFn> {
+    /// Returns the address being listened on.
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr.clone()
+    }
 }
 
-impl<Item, SinkItem> Stream for Incoming<Item, SinkItem>
+impl<Item, SinkItem, Codec, CodecFn> Stream for Incoming<Item, SinkItem, Codec, CodecFn>
 where
-    Item: for<'a> Deserialize<'a>,
+    Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
+    Codec: Serializer<SinkItem> + Deserializer<Item>,
+    CodecFn: Fn() -> Codec,
 {
-    type Item = io::Result<UnixTransport<Item, SinkItem>>;
+    type Item = io::Result<(u32, Transport<UnixStream, Item, SinkItem, Codec>)>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let next = ready!(self.incoming().poll_next(cx)?);
-        Poll::Ready(next.map(|conn| Ok(UnixTransport::new(conn))))
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let next =
+            ready!(Pin::new(&mut self.as_mut().project().listener.incoming()).poll_next(cx)?);
+        Poll::Ready(next.map(|conn| Ok(new(conn, (self.codec_fn)()))))
     }
 }
