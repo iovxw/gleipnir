@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2"
-treebitmap = "0.3"
+treebitmap = "0.4"
 nix = "0.13"
 tarpc = { version = "0.18",  features = ["tokio1", "serde1", "serde-transport"], git = "https://github.com/google/tarpc.git" }
 futures = "0.3"
