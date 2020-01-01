@@ -12,6 +12,6 @@ tarpc = { version = "0.18",  features = ["tokio1", "serde1", "serde-transport"],
 futures = "0.3"
 tokio = { version = "0.2", features = ["net", "stream"] }
 tokio-serde = "0.6"
-async-bincode = "0.4"
+async-bincode = "0.5"
 pin-project = "0.4"
 serde = { version = "1.0", features = ["derive"] }
