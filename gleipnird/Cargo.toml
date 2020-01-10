@@ -8,7 +8,7 @@ edition = '2018'
 jemallocator = "0.3"
 failure = "0.1"
 libc = "0.2"
-nfq = { version = "0.2", git = "https://github.com/nbdd0121/nfq-rs.git", rev = "b174e2f63f4baac" }
+nfq = { version = "0.2", git = "https://github.com/nbdd0121/nfq-rs.git", rev = "c0663baf3113dcd0257" }
 pnet = "0.22"
 pnet_macros_support = "0.22"
 pnetlink = { version = "0.0.3", git = "https://github.com/polachok/pnetlink.git" }
