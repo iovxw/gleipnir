@@ -499,8 +499,8 @@ dependencies = [
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
- "tarpc 0.18.0 (git+https://github.com/google/tarpc.git)",
+ "serde_json 1.0.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tarpc 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-serde 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -516,7 +516,7 @@ dependencies = [
  "nix 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-project 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
- "tarpc 0.18.0 (git+https://github.com/google/tarpc.git)",
+ "tarpc 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-serde 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "treebitmap 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -549,7 +549,7 @@ dependencies = [
  "serde 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tarpc 0.18.0 (git+https://github.com/google/tarpc.git)",
+ "tarpc 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-serde 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-threadpool 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1398,8 +1398,8 @@ dependencies = [
 
 [[package]]
 name = "tarpc"
-version = "0.18.0"
-source = "git+https://github.com/google/tarpc.git#45af6ccdeb631aee74d1472d4216cf5cdf652a2f"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1409,7 +1409,7 @@ dependencies = [
  "raii-counter 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
- "tarpc-plugins 0.5.1 (git+https://github.com/google/tarpc.git)",
+ "tarpc-plugins 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-serde 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-util 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1417,12 +1417,12 @@ dependencies = [
 
 [[package]]
 name = "tarpc-plugins"
-version = "0.5.1"
-source = "git+https://github.com/google/tarpc.git#45af6ccdeb631aee74d1472d4216cf5cdf652a2f"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.39 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1959,8 +1959,8 @@ dependencies = [
 "checksum syntex_errors 0.42.0 (registry+https://github.com/rust-lang/crates.io-index)" = "04c48f32867b6114449155b2a82114b86d4b09e1bddb21c47ff104ab9172b646"
 "checksum syntex_pos 0.42.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd49988e52451813c61fecbe9abb5cfd4e1b7bb6cdbb980a6fbcbab859171a6"
 "checksum syntex_syntax 0.42.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7628a0506e8f9666fdabb5f265d0059b059edac9a3f810bda077abb5d826bd8d"
-"checksum tarpc 0.18.0 (git+https://github.com/google/tarpc.git)" = "<none>"
-"checksum tarpc-plugins 0.5.1 (git+https://github.com/google/tarpc.git)" = "<none>"
+"checksum tarpc 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "43966b393fd4c09e6c34df314d9e6184e87a9c191da6afb400276bb384d81ece"
+"checksum tarpc-plugins 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "137af8d98d0fbb502b06e0ab113c5ed4dc6432e272f4be2e261c3b94f43296a0"
 "checksum term 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "fa63644f74ce96fbeb9b794f66aff2a52d601cbd5e80f4b97123e3899f4570f1"
 "checksum termion 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "6a8fb22f7cde82c8220e5aeacb3258ed7ce996142c77cba193f203515e26c330"
 "checksum textwrap 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
