@@ -23,7 +23,7 @@ futures-locks = "0.3"
 tokio = { version = "0.2", features = ["blocking", "rt-threaded"] }
 tokio-serde = { version = "0.6", features = ["bincode"] }
 tokio-threadpool = "0.1"
-async-bincode = "0.4"
+async-bincode = "0.5"
 pin-utils = "0.1.0-alpha.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
