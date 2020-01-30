@@ -19,7 +19,7 @@ dbus = "0.7"
 nix = "0.14"
 tarpc = { version = "0.20",  features = ["tokio1", "serde1", "serde-transport"] }
 futures = { version = "0.3", features = ["compat"] }
-futures-locks = "0.3"
+futures-locks = "0.5"
 tokio = { version = "0.2", features = ["blocking", "rt-threaded"] }
 tokio-serde = { version = "0.6", features = ["bincode"] }
 tokio-threadpool = "0.1"
