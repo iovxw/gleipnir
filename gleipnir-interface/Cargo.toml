@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 libc = "0.2"
 treebitmap = "0.4"
-nix = "0.14"
+nix = "0.16"
 tarpc = { version = "0.20",  features = ["tokio1", "serde1", "serde-transport"] }
 futures = "0.3"
 tokio = { version = "0.2", features = ["net", "stream"] }
