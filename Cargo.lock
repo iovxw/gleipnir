@@ -343,13 +343,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "dbus-codegen"
-version = "0.4.1"
+name = "dbus"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae30fa3237c3a4e04fd02db3586b30b88b435662326f5574d3349d5f8fdbdaea"
+checksum = "2fd043051adb767dd40f869e6034c8ea4d3a0a719e78d4058f705a8038649059"
+dependencies = [
+ "libc",
+ "libdbus-sys",
+]
+
+[[package]]
+name = "dbus-codegen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e55517298e05b37a6cee6bc2bc5cad35c31785c5f557e3d9dd9a8ff06368b721"
 dependencies = [
  "clap",
- "dbus",
+ "dbus 0.8.1",
  "xml-rs",
 ]
 
@@ -594,7 +604,7 @@ dependencies = [
  "async-bincode",
  "crossbeam-channel",
  "ctrlc",
- "dbus",
+ "dbus 0.7.1",
  "dbus-codegen",
  "failure",
  "futures 0.3.4",
