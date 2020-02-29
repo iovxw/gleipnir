@@ -16,7 +16,7 @@ lazy_static = "1.4"
 treebitmap = "0.4"
 lru_time_cache = "0.9"
 dbus = "0.7"
-nix = "0.14"
+nix = "0.17"
 tarpc = { version = "0.20",  features = ["tokio1", "serde1", "serde-transport"] }
 futures = { version = "0.3", features = ["compat"] }
 futures-locks = "0.5"
