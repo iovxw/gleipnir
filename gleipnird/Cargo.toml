@@ -15,7 +15,7 @@ pnetlink = { version = "0.0.3", git = "https://github.com/polachok/pnetlink.git"
 lazy_static = "1.4"
 treebitmap = "0.4"
 lru_time_cache = "0.9"
-dbus = "0.7"
+dbus = "0.8"
 nix = "0.17"
 tarpc = { version = "0.20",  features = ["tokio1", "serde1", "serde-transport"] }
 futures = { version = "0.3", features = ["compat"] }
