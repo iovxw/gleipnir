@@ -39,7 +39,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "serde",
- "tokio 0.2.15",
+ "tokio 0.2.16",
 ]
 
 [[package]]
@@ -566,7 +566,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tarpc",
- "tokio 0.2.15",
+ "tokio 0.2.16",
  "tokio-serde",
  "toml",
 ]
@@ -582,7 +582,7 @@ dependencies = [
  "pin-project",
  "serde",
  "tarpc",
- "tokio 0.2.15",
+ "tokio 0.2.16",
  "tokio-serde",
  "treebitmap",
 ]
@@ -615,7 +615,7 @@ dependencies = [
  "serde_json",
  "slab",
  "tarpc",
- "tokio 0.2.15",
+ "tokio 0.2.16",
  "tokio-serde",
  "tokio-threadpool",
  "treebitmap",
@@ -1618,7 +1618,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "tarpc-plugins",
- "tokio 0.2.15",
+ "tokio 0.2.16",
  "tokio-serde",
  "tokio-util",
 ]
@@ -1699,9 +1699,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "619cdb2245c40c42d563089b72e80c5df659513d667a017598439ef7a7b1ffe1"
+checksum = "ee5a0dd887e37d37390c13ff8ac830f992307fe30a1fff0ab8427af67211ba28"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
@@ -1917,7 +1917,7 @@ dependencies = [
  "futures-sink",
  "log 0.4.8",
  "pin-project-lite",
- "tokio 0.2.15",
+ "tokio 0.2.16",
 ]
 
 [[package]]
