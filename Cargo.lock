@@ -657,9 +657,9 @@ checksum = "46dbcb333e86939721589d25a3557e180b52778cb33c7fdfe9e0158ff790d5ec"
 
 [[package]]
 name = "intervaltree"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8254add2ea664734c9d001f8151cc3d7696b135f7e40e5a2efa814a662cb3a44"
+checksum = "566d5aa3b5cc5c5809cc1a9c9588d917a634248bfc58f7ea14e354e71595a32c"
 dependencies = [
  "smallvec 1.2.0",
 ]
