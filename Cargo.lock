@@ -334,9 +334,9 @@ dependencies = [
 
 [[package]]
 name = "dbus"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f8875bb7afbc20dec12db09e18af3dcbd672b08592d2932950326a6437c616"
+checksum = "26b17a12ffaff26515889b006fc029493a3e340366a137c13cec2cdd545ea3b8"
 dependencies = [
  "libc",
  "libdbus-sys",
