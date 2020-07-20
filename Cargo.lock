@@ -304,21 +304,12 @@ dependencies = [
 
 [[package]]
 name = "cstr"
-version = "0.1.7"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19f7a08ed4ecd7e077d4cee63937473e6f7cf57b702a9114ef41751b2cbc0f60"
+checksum = "9acb5cdbd3ef1044b223980453a0a8318594d75ef532bedf9fa21404869c8b08"
 dependencies = [
- "cstr-macros",
- "procedural-masquerade",
-]
-
-[[package]]
-name = "cstr-macros"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd670e5ff58768ef624207fb95709ce63b8d05573fb9a05165f0eef471ea6a3a"
-dependencies = [
- "procedural-masquerade",
+ "proc-macro2",
+ "quote",
  "syn",
 ]
 
@@ -1201,12 +1192,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "procedural-masquerade"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a1574a51c3fd37b26d2c0032b649d08a7d51d4cca9c41bbc5bf7118fa4509d0"
-
-[[package]]
 name = "qmetaobject"
 version = "0.1.4"
 source = "git+https://github.com/iovxw/qmetaobject-rs.git#78381164ba5ff061a27aea405aa3257cb4caf5d8"
@@ -1235,9 +1220,9 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quote"
-version = "1.0.2"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053a8c8bcc71fcce321828dc897a98ab9760bef03a4fc36693c231e5b3216cfe"
+checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
  "proc-macro2",
 ]

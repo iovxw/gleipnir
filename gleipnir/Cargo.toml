@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 jemallocator = "0.3"
 failure = "0.1"
-cstr = "0.1"
+cstr = "0.2"
 cpp = "0.5"
 qmetaobject = { version = "0.1", git = "https://github.com/iovxw/qmetaobject-rs.git" }
 serde = { version = "1.0", features = ["derive"] }
