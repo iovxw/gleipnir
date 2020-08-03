@@ -28,6 +28,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b602bfe940d21c130f3895acd65221e8a61270debe89d628b9cb4e3ccb8569b"
+
+[[package]]
 name = "async-bincode"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1228,12 +1234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "raii-counter"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca2cc9eb8fd5c1faa55b5ec00c3088edcef008fc388647bd34bf3677c2f9d3e4"
-
-[[package]]
 name = "rand"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1521,6 +1521,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
 
 [[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1600,18 +1606,19 @@ dependencies = [
 
 [[package]]
 name = "tarpc"
-version = "0.20.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43966b393fd4c09e6c34df314d9e6184e87a9c191da6afb400276bb384d81ece"
+checksum = "547c21f2a112fbdfde992676d2d42f3e1d65ec9e9f854c29e1a87c1b9d4ac213"
 dependencies = [
+ "anyhow",
  "fnv",
  "futures 0.3.5",
  "humantime",
  "log 0.4.8",
  "pin-project",
- "raii-counter",
  "rand 0.7.3",
  "serde",
+ "static_assertions",
  "tarpc-plugins",
  "tokio 0.2.21",
  "tokio-serde",
@@ -1620,9 +1627,9 @@ dependencies = [
 
 [[package]]
 name = "tarpc-plugins"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "137af8d98d0fbb502b06e0ab113c5ed4dc6432e272f4be2e261c3b94f43296a0"
+checksum = "edbaf92ceea0a2ab555bea18a47a891e46ba2d6f930ec9506771662f4ab82bb7"
 dependencies = [
  "proc-macro2",
  "quote",
