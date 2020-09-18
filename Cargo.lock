@@ -775,9 +775,9 @@ dependencies = [
 
 [[package]]
 name = "lru_time_cache"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb241df5c4caeb888755363fc95f8a896618dc0d435e9e775f7930cb099beab"
+checksum = "53883292fdb9976d4666a9ede31ed599c255be9715947a8bd2adc72522e66749"
 
 [[package]]
 name = "maybe-uninit"
