@@ -310,13 +310,12 @@ dependencies = [
 
 [[package]]
 name = "cstr"
-version = "0.2.1"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9acb5cdbd3ef1044b223980453a0a8318594d75ef532bedf9fa21404869c8b08"
+checksum = "d59a053faf8d8062404e09ef74417a6ac0d337b6729e26ee5f0b4a839f8ff61d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
 ]
 
 [[package]]
