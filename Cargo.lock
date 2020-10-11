@@ -673,15 +673,6 @@ dependencies = [
 
 [[package]]
 name = "ipnetwork"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3d862c86f7867f19b693ec86765e0252d82e53d4240b9b629815675a0714ad1"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "ipnetwork"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a69dd5e3613374e74da81c251750153abe3bd0ad17641ea63d43d1e21d0dbd4d"
@@ -988,16 +979,16 @@ checksum = "05da548ad6865900e60eaba7f589cc0783590a92e940c26953ff81ddbab2d677"
 
 [[package]]
 name = "pnet"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63d693c84430248366146e3181ff9d330243464fa9e6146c372b2f3eb2e2d8e7"
+checksum = "9788fd699543f1e945b6b9b89c3059ae8564d9b6c062c44b1c5630e1f1a07a6c"
 dependencies = [
- "ipnetwork 0.14.0",
+ "ipnetwork",
  "pnet_base",
- "pnet_datalink 0.22.0",
- "pnet_packet 0.22.0",
- "pnet_sys 0.22.0",
- "pnet_transport 0.22.0",
+ "pnet_datalink 0.23.1",
+ "pnet_packet 0.23.1",
+ "pnet_sys 0.23.1",
+ "pnet_transport 0.23.1",
 ]
 
 [[package]]
@@ -1006,7 +997,7 @@ version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c08c2c6c26481fcbe49dc4405baedf47151f859c5a45d3f254c2ff74ce51cf0"
 dependencies = [
- "ipnetwork 0.15.1",
+ "ipnetwork",
  "pnet_base",
  "pnet_datalink 0.25.0",
  "pnet_packet 0.25.0",
@@ -1022,14 +1013,14 @@ checksum = "4df28acf2fcc77436dd2b91a9a0c2bb617f9ca5f2acefee1a4135058b9f9801f"
 
 [[package]]
 name = "pnet_datalink"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b34f8ca857599d05b6b082e9baff8d27c54cb9c26568cf3c0993a5755816966"
+checksum = "d27361d7578b410d0eb5fe815c2b2105b01ab770a7c738cb9a231457a809fcc7"
 dependencies = [
- "ipnetwork 0.14.0",
+ "ipnetwork",
  "libc",
  "pnet_base",
- "pnet_sys 0.22.0",
+ "pnet_sys 0.25.0",
  "winapi 0.2.8",
 ]
 
@@ -1039,7 +1030,7 @@ version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "545f8df67cbc53438f37f56e68ae5ca49beb3990e9fd7e9e214c8ffd36c0e0ea"
 dependencies = [
- "ipnetwork 0.15.1",
+ "ipnetwork",
  "libc",
  "pnet_base",
  "pnet_sys 0.25.0",
@@ -1048,9 +1039,9 @@ dependencies = [
 
 [[package]]
 name = "pnet_macros"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2f16d1fa7fd0edebc36055587b8b5af8a109bbc29a55fb484a37e2029b971a7"
+checksum = "49359aee04645a648a8f53c3cf2a25b4953410021d83c40a68cbc918ef45bb59"
 dependencies = [
  "regex",
  "syntex",
@@ -1079,6 +1070,15 @@ dependencies = [
 
 [[package]]
 name = "pnet_macros_support"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5326f15c063df43835c5a6e13fc81af2520e9fd104ce1310e15166bb2921d9bd"
+dependencies = [
+ "pnet_base",
+]
+
+[[package]]
+name = "pnet_macros_support"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e586854ba703c15f74c486e1a46624566b47f1f61cc8a6b02c6bbe5e34a383b"
@@ -1088,14 +1088,14 @@ dependencies = [
 
 [[package]]
 name = "pnet_packet"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a6cdcdaddc5174f18286298842a4e31cd3cc018933d42af51434b1fa07dcbe"
+checksum = "5521d195b9eb5c1632ea07b41ae14363e2d323f8a40ae51ce2c242acd4a9cda5"
 dependencies = [
  "glob",
  "pnet_base",
  "pnet_macros 0.25.0",
- "pnet_macros_support 0.22.0",
+ "pnet_macros_support 0.23.1",
  "syntex",
 ]
 
@@ -1114,9 +1114,9 @@ dependencies = [
 
 [[package]]
 name = "pnet_sys"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "682b2eca84cc440bce8336813f78eb6d3cb0fed89fe0e87ae22acfca8363f176"
+checksum = "2f99aaa6904399415eb195f0d4a7c3bcf29de2f677d928ec3703f7aebf3c9f39"
 dependencies = [
  "libc",
  "winapi 0.2.8",
@@ -1136,14 +1136,14 @@ dependencies = [
 
 [[package]]
 name = "pnet_transport"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5faa55dcf725487a699adcff88dfea8f17ea34fa2640528866d9acbb4e3a104f"
+checksum = "91ac26532b90ad979579f3364ceea0af86ec3cbcd10505101d519d6f49193e9b"
 dependencies = [
  "libc",
  "pnet_base",
- "pnet_packet 0.22.0",
- "pnet_sys 0.22.0",
+ "pnet_packet 0.23.1",
+ "pnet_sys 0.23.1",
 ]
 
 [[package]]
@@ -1161,7 +1161,7 @@ dependencies = [
 [[package]]
 name = "pnetlink"
 version = "0.0.3"
-source = "git+https://github.com/polachok/pnetlink.git#d5af12a64fb4ec896984bbbb3f8a9932b7423aa2"
+source = "git+https://github.com/polachok/pnetlink.git#f66d45b3e55735d5eb3b233ebc18c4ee397a875c"
 dependencies = [
  "bitflags 1.2.1",
  "byteorder",
@@ -1169,9 +1169,9 @@ dependencies = [
  "futures 0.1.29",
  "libc",
  "mio",
- "pnet 0.22.0",
- "pnet_macros 0.22.0",
- "pnet_macros_support 0.22.0",
+ "pnet 0.23.1",
+ "pnet_macros 0.23.1",
+ "pnet_macros_support 0.23.1",
  "rand 0.6.5",
  "syntex",
  "tokio-core",
