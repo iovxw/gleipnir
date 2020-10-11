@@ -1618,9 +1618,9 @@ dependencies = [
 
 [[package]]
 name = "tarpc"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "547c21f2a112fbdfde992676d2d42f3e1d65ec9e9f854c29e1a87c1b9d4ac213"
+checksum = "1503e47bfae912674d6f4226c09cb8d2f0271a57eef7e799b6f98a545f89c7a3"
 dependencies = [
  "anyhow",
  "fnv",
@@ -1921,9 +1921,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "571da51182ec208780505a32528fc5512a8fe1443ab960b3f2f3ef093cd16930"
+checksum = "be8242891f2b6cbef26a2d7e8605133c2c554cd35b3e4948ea892d6d68436499"
 dependencies = [
  "bytes 0.5.4",
  "futures-core",
