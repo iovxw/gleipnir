@@ -322,11 +322,11 @@ dependencies = [
 
 [[package]]
 name = "ctrlc"
-version = "3.1.6"
+version = "3.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0b676fa23f995faf587496dcd1c80fead847ed58d2da52ac1caca9a72790dd2"
+checksum = "b57a92e9749e10f25a171adcebfafe72991d45e7ec2dcb853e8f83d9dafaeb08"
 dependencies = [
- "nix 0.17.0",
+ "nix",
  "winapi 0.3.8",
 ]
 
@@ -590,7 +590,7 @@ dependencies = [
  "async-bincode",
  "futures 0.3.6",
  "libc",
- "nix 0.18.0",
+ "nix",
  "pin-project 1.0.1",
  "serde",
  "tarpc",
@@ -618,7 +618,7 @@ dependencies = [
  "libc",
  "lru_time_cache",
  "nfq",
- "nix 0.18.0",
+ "nix",
  "pin-utils",
  "pnet 0.25.0",
  "pnet_macros_support 0.22.0",
@@ -870,19 +870,6 @@ version = "0.2.3"
 source = "git+https://github.com/nbdd0121/nfq-rs.git?rev=c0663baf3113dcd0257#c0663baf3113dcd02572a49da39f92d4d28d3a57"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "nix"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e4785f2c3b7589a0d0c1dd60285e1188adac4006e8abd6dd578e1567027363"
-dependencies = [
- "bitflags 1.2.1",
- "cc",
- "cfg-if",
- "libc",
- "void",
 ]
 
 [[package]]
@@ -2008,12 +1995,6 @@ name = "vec_map"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
-
-[[package]]
-name = "void"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "wasi"
