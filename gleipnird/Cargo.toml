@@ -34,4 +34,4 @@ gleipnir-interface = { version = "0.1", path = "../gleipnir-interface" }
 ctrlc = { version = "3.1", features = ["termination"] }
 
 [build-dependencies]
-dbus-codegen = "0.5"
+dbus-codegen = "0.9"
