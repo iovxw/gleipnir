@@ -350,7 +350,7 @@ version = "3.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b57a92e9749e10f25a171adcebfafe72991d45e7ec2dcb853e8f83d9dafaeb08"
 dependencies = [
- "nix",
+ "nix 0.18.0",
  "winapi 0.3.8",
 ]
 
@@ -614,7 +614,7 @@ dependencies = [
  "async-bincode",
  "futures 0.3.6",
  "libc",
- "nix",
+ "nix 0.19.0",
  "pin-project 1.0.1",
  "serde",
  "tarpc",
@@ -642,7 +642,7 @@ dependencies = [
  "libc",
  "lru_time_cache",
  "nfq",
- "nix",
+ "nix 0.19.0",
  "pin-utils",
  "pnet 0.25.0",
  "pnet_macros_support 0.22.0",
@@ -901,6 +901,18 @@ name = "nix"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83450fe6a6142ddd95fb064b746083fc4ef1705fe81f64a64e1d4b39f54a1055"
+dependencies = [
+ "bitflags 1.2.1",
+ "cc",
+ "cfg-if 0.1.10",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85db2feff6bf70ebc3a4793191517d5f0331100a2f10f9bf93b5e5214f32b7b7"
 dependencies = [
  "bitflags 1.2.1",
  "cc",
