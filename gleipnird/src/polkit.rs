@@ -19,9 +19,9 @@ pub fn check_authorization(pid: u32) -> bool {
         Duration::from_secs(1),
     );
 
-    let mut subject: HashMap<&str, Variant<Box<dyn RefArg>>> = HashMap::new();
-    subject.insert("pid", Variant(Box::new(pid)));
-    subject.insert("start-time", Variant(Box::new(start_time)));
+    let mut subject: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+    subject.insert("pid".into(), Variant(Box::new(pid)));
+    subject.insert("start-time".into(), Variant(Box::new(start_time)));
     let details = HashMap::new();
     let (is_authorized, is_challenge, details) = authority
         .check_authorization(
