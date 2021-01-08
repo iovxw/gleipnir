@@ -9,7 +9,7 @@ jemallocator = "0.3"
 failure = "0.1"
 libc = "0.2"
 nfq = { version = "0.2", git = "https://github.com/nbdd0121/nfq-rs.git", rev = "c0663baf3113dcd0257" }
-pnet = "0.26"
+pnet = "0.27"
 pnet_macros_support = "0.26"
 pnetlink = { version = "0.0.3", git = "https://github.com/polachok/pnetlink.git", rev = "1c2162c03604362e" }
 lazy_static = "1.4"
