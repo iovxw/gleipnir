@@ -8,7 +8,7 @@ edition = "2018"
 libc = "0.2"
 treebitmap = "0.4"
 nix = "0.18"
-tarpc = { version = "0.22",  features = ["tokio1", "serde1", "serde-transport"] }
+tarpc = { version = "0.24",  features = ["tokio1", "serde1", "serde-transport"] }
 futures = "0.3"
 tokio = { version = "0.2", features = ["net", "stream"] }
 tokio-serde = "0.6"

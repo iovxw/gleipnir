@@ -20,7 +20,7 @@ lazy_static = "1.4"
 futures = { version = "0.3", features = ["compat"] }
 tokio = { version = "0.2", features = ["rt-core"] }
 tokio-serde = { version = "0.6", features = ["bincode"] }
-tarpc = { version = "0.22",  features = ["tokio1", "serde1", "serde-transport"] }
+tarpc = { version = "0.24",  features = ["tokio1", "serde1", "serde-transport"] }
 defer = "0.1"
 gleipnir-interface = { version = "0.1", path = "../gleipnir-interface" }
 
