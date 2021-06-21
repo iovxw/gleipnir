@@ -333,12 +333,13 @@ dependencies = [
 
 [[package]]
 name = "dbus"
-version = "0.9.1"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b1334c0161ddfccd239ac81b188d62015b049c986c5cd0b7f9447cf2c54f4a3"
+checksum = "c8862bb50aa3b2a2db5bfd2c875c73b3038aa931c411087e335ca8ca0ed430b9"
 dependencies = [
  "libc",
  "libdbus-sys",
+ "winapi 0.3.9",
 ]
 
 [[package]]
