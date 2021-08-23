@@ -149,7 +149,7 @@ pub fn run(
 
     let server = async move {
         let incoming = unixtransport::listen(&addr, Bincode::default).await?;
-        fs::set_permissions(&addr, fs::Permissions::from_mode(755))?;
+        fs::set_permissions(&addr, fs::Permissions::from_mode(0o755))?;
 
         incoming
             .filter_map(|r| future::ready(r.ok()))
